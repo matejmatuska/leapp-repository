@@ -1,0 +1,41 @@
+            elif getargbool 0 ro; then
+                # if "ro" is specified, we want /usr to be mounted read-only
+                _opts="${_opts:+${_opts},}ro"
+    old_opts="defaults,ro"
+args="ro rd.lvm.lv=testing/root rd.lvm.lv=testing/swap rhgb quiet LANG=en_US.UTF-8"
+                            size='10G', bsize=10*(1 << 39), ro='0', tp='crypt', mountpoint='')]
+                            size='10G', bsize=10*(1 << 39), ro='0', tp='crypt', mountpoint='')]
+                               size='10G', bsize=10*(1 << 39), ro='0', tp='part', mountpoint='/boot')]
+FILES = ['/file1', '/file2', '/dir/ect/ory/file3', '/file4', '/file5']
+Flags:                           esan3 zarch stfle msa ldisp eimm dfp edat etf3eh highgprs te vx vxd vxe gs vxe2 vxp sort dflt sie
+Flags:                           esan3 zarch stfle msa ldisp eimm dfp edat etf3eh highgprs te vx vxd vxe gs vxe2 vxp sort dflt sie
+    with open(releasever_path, 'r') as fo:
+        releasever = fo.readline().strip()
+    with open(releasever_path, 'w') as fo:
+        fo.write(releasever+'\n')
+    with open('/etc/selinux/config') as fo:
+        result = [l for l in (line.strip() for line in fo) if l]
+    cmd = ['lsblk', '-pbnr', '--output', 'NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT']
+        dev_path, maj_min, rm, bsize, ro, tp, mountpoint = entry
+            ro=ro,
+            ro=ro,
+        if cmd == ['lsblk', '-pbnr', '--output', 'NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT']:
+            ro='0',
+            ro='0',
+            ro='0',
+            ro='0',
+            ro='0',
+tmpfs /sys/fs/cgroup tmpfs ro,seclabel,nosuid,nodev,noexec,mode=755 0 0
+        with open('/boot/grub2/grub.cfg') as fo:
+            content = fo.read()
+        with open(self.opts.filename, 'w+') as fo:
+            json.dump(self.plugin_data, fo, sort_keys=True, indent=2)
+        with open(self.opts.filename) as fo:
+            self.plugin_data = json.load(fo)
+    ro = fields.String()
+[loggin#!@g]
+args="ro uned_params"
+args="ro"
+    with open(GRUB_CFG_PATH, 'r') as fo:
+        grub_cfg = fo.read()
+        ro='0',

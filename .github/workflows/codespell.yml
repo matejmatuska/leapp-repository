@@ -16,3 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: codespell-project/actions-codespell@master
+        with:
+          exclude_file: .codespell-exclude-lines
+          skip: repos/system_upgrade/common/actors/storagescanner/tests/files/mounts
