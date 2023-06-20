@@ -44,6 +44,7 @@ build() {
         DRACUT_LVMCONF_ARG="--lvmconf"
     fi
     DRACUT_MDADMCONF_ARG="--nomdadmconf"
+    LEAPP_DRACUT_MDADMCONF="yes"
     if [[ -n "$LEAPP_DRACUT_MDADMCONF" ]]; then
         # include local /etc/mdadm.conf
         DRACUT_MDADMCONF_ARG="--mdadmconf"

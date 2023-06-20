@@ -5,7 +5,8 @@ from leapp.models import CopyFile, TargetUserSpacePreupgradeTasks
 
 # Maps src location in the source system to the destination within the target system
 FILES_TO_COPY_IF_PRESENT = {
-    '/etc/hosts': '/etc/hosts'
+    '/etc/hosts': '/etc/hosts',
+    '/etc/mdadm.conf': '/etc/mdadm.conf'
 }
 
 
