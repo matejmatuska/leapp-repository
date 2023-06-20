@@ -10,6 +10,7 @@ from leapp.models import (
     FstabEntry,
     LsblkEntry,
     LvdisplayEntry,
+    MDArrayEntry,
     MountEntry,
     PartitionEntry,
     PvsEntry,
@@ -261,6 +262,41 @@ def _get_systemd_mount_info():
         )
 
 
+@aslist
+def _get_mdraid_info(mdstat_path):
+    """ Collect storage info from /proc/mdstat file """
+    if _is_file_readable(mdstat_path):
+        with open(mdstat_path, 'r') as fp:
+            lines = fp.readlines()
+            personalities = [s[1:-1] for s in lines[0].split(':', 2)[1].lstrip().split(' ')]
+
+            i = 1
+            while i < len(lines) - 1:
+                device, rest = lines[i].split(':', 2)
+                rest = rest.strip().split(' ')
+                state = rest[0]
+
+                if rest[1] in personalities:
+                    level = rest[1]
+                    devices = rest[2:]
+                else:
+                    level = 'unknown'
+                    devices = rest[1:]
+
+                devices = [dev[:dev.index('[')] for dev in devices]
+
+                yield MDArrayEntry(
+                    device_name=device.strip(),
+                    state=state,
+                    level=level,
+                    component_devices=devices
+                )
+                while lines[i] != '\n' and i < len(lines) - 1:
+                    # skip until next array entry
+                    i = i + 1
+                i = i + 1
+
+
 def get_storage_info():
     """ Collect multiple info about storage and return it """
     return StorageInfo(
@@ -271,4 +307,6 @@ def get_storage_info():
         pvs=_get_pvs_info(),
         vgs=_get_vgs_info(),
         lvdisplay=_get_lvdisplay_info(),
-        systemdmount=_get_systemd_mount_info())
+        systemdmount=_get_systemd_mount_info(),
+        mdraid=_get_mdraid_info('/proc/mdstat')
+    )

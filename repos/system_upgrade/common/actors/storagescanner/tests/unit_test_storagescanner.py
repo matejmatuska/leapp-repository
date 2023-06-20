@@ -11,6 +11,7 @@ from leapp.models import (
     FstabEntry,
     LsblkEntry,
     LvdisplayEntry,
+    MDArrayEntry,
     MountEntry,
     PartitionEntry,
     PvsEntry,
@@ -498,3 +499,36 @@ def test_get_systemd_mount_info(monkeypatch):
             label='n/a',
             uuid='c3890bf3-9273-4877-ad1f-68144e1eb858')]
     assert expected == storagescanner._get_systemd_mount_info()
+
+
+def test_get_mdraid_info(monkeypatch):
+    expected = [
+        MDArrayEntry(
+            device_name='md1',
+            level='raid1',
+            state='active',
+            component_devices=sorted(['sda2', 'sdb2'])),
+        MDArrayEntry(
+            device_name='md0',
+            level='raid1',
+            state='active',
+            component_devices=sorted(['sda1', 'sdb1'])),
+        MDArrayEntry(
+            device_name='md127',
+            level='raid5',
+            state='active',
+            component_devices=sorted(['sdh1', 'sdg1', 'sdf1', 'sde1', 'sdd1', 'sdc1'])),
+        MDArrayEntry(
+            device_name='md_d0',
+            level='unknown',
+            state='inactive',
+            component_devices=sorted(['sdd1', 'sdf1', 'sde1', 'sdb1'])),
+        ]
+
+    scanned = storagescanner._get_mdraid_info(os.path.join(CUR_DIR, 'files/mdstat'))
+    for arr in scanned:
+        arr.component_devices.sort()
+
+    assert expected == scanned
+    monkeypatch.setattr(storagescanner, '_is_file_readable', lambda dummy: False)
+    assert [] == storagescanner._get_mdraid_info('unreadable_file')

@@ -97,6 +97,16 @@ class SystemdMountEntry(Model):
     uuid = fields.String()
 
 
+class MDArrayEntry(Model):
+    topic = SystemInfoTopic
+
+# TODO enums?
+    device_name = fields.String()
+    state = fields.String()
+    level = fields.String()
+    component_devices = fields.List(fields.String(), default=[])
+
+
 class StorageInfo(Model):
     topic = SystemInfoTopic
     partitions = fields.List(fields.Model(PartitionEntry), default=[])
@@ -107,3 +117,4 @@ class StorageInfo(Model):
     vgs = fields.List(fields.Model(VgsEntry), default=[])
     lvdisplay = fields.List(fields.Model(LvdisplayEntry), default=[])
     systemdmount = fields.List(fields.Model(SystemdMountEntry), default=[])
+    mdraid = fields.List(fields.Model(MDArrayEntry), default=[])
