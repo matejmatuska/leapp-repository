@@ -6,6 +6,8 @@ Tutorials
     :caption: Contents:
     :glob:
 
+    howto-first-actor-upgrade
+
 .. Indices and tables
 .. ==================
 ..
