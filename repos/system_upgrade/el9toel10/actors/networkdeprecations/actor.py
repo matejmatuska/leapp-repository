@@ -21,6 +21,7 @@ class CheckNetworkDeprecations9to10(Actor):
     produces = (Report,)
     tags = (ChecksPhaseTag, IPUWorkflowTag,)
 
+
     @staticmethod
     def report_dhclient():
         title = 'Deprecated DHCP plugin configured'
@@ -40,6 +41,7 @@ class CheckNetworkDeprecations9to10(Actor):
             reporting.RelatedResource('package', 'dhcp-client'),
             reporting.RelatedResource('package', 'NetworkManager'),
         ])
+
 
     @staticmethod
     def report_ifcfg_rules(conn):
@@ -73,6 +75,7 @@ class CheckNetworkDeprecations9to10(Actor):
         ] + [reporting.RelatedResource('file', file) for file in conn.values()])
         pass
 
+
     @staticmethod
     def report_ifcfg_leftover(conn):
         reporting.create_report([
@@ -90,6 +93,7 @@ class CheckNetworkDeprecations9to10(Actor):
             reporting.Groups([reporting.Groups.NETWORK, reporting.Groups.SERVICES]),
             reporting.Groups([reporting.Groups.INHIBITOR]),
         ] + [reporting.RelatedResource('file', file) for file in conn.values()])
+
 
     @staticmethod
     def report_ifcfg(conn):
@@ -118,6 +122,7 @@ class CheckNetworkDeprecations9to10(Actor):
             reporting.Groups([reporting.Groups.INHIBITOR]),
             reporting.RelatedResource('package', 'NetworkManager'),
         ] + [reporting.RelatedResource('file', file) for file in conn.values()])
+
 
     def process(self):
         for nm_config in self.consume(NetworkManagerConfig):

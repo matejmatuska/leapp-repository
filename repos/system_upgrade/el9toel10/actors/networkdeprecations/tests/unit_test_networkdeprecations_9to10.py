@@ -3,6 +3,7 @@ import pytest
 from leapp.models import IfCfg, NetworkManagerConfig, Report
 from leapp.utils.report import is_inhibitor
 
+
 def test_dhcp_dhclient(current_actor_context):
     current_actor_context.feed(NetworkManagerConfig(dhcp='dhclient'))
     current_actor_context.run()
@@ -26,6 +27,7 @@ def test_dhcp_default(current_actor_context):
     reports = list(current_actor_context.consume(Report))
     assert not reports
 
+
 def test_ifcfg(current_actor_context):
     """
     Report when a file ready for migration is present.
@@ -44,6 +46,7 @@ def test_ifcfg(current_actor_context):
     assert resources[0]['title'] == 'NetworkManager'
     assert resources[1]['scheme'] == 'file'
     assert resources[1]['title'] == '/NM/ifcfg-eth-dev'
+
 
 @pytest.mark.parametrize('files',
                          [('/NM/rule-lost',),
@@ -66,6 +69,7 @@ def test_leftovers(current_actor_context, files):
     for i in range(len(files)):
         assert resources[i]['scheme'] == 'file'
         assert resources[i]['title'] == files[i]
+
 
 @pytest.mark.parametrize('files',
                          [('/NM/ifcfg-old', '/NM/rule-old'),
