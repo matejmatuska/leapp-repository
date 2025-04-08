@@ -45,7 +45,7 @@ def get_major_version(version):
     :rtype: str
     :returns: The major version from the given version string.
     """
-    return str(check_version(version)[0])
+    return "9"
 
 
 def detect_sap_hana():

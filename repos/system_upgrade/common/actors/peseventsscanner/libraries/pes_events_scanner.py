@@ -106,7 +106,7 @@ def get_relevant_releases(events):
     # Collect releases that happened between source OS version and target OS version
     relevant_releases_match_list = [
         '> {0}'.format(api.current_actor().configuration.version.source),
-        '<= {0}'.format(api.current_actor().configuration.version.target)
+        '<= {0}.10'.format(api.current_actor().configuration.version.target)
     ]
     releases = {event.to_release for event in events}
     releases = [r for r in releases if version.matches_version(relevant_releases_match_list, '{}.{}'.format(*r))]

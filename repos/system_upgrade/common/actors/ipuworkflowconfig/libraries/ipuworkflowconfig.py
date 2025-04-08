@@ -55,8 +55,8 @@ def get_os_release(path):
                 release_id=data.get('ID', '').strip('"'),
                 name=data.get('NAME', '').strip('"'),
                 pretty_name=data.get('PRETTY_NAME', '').strip('"'),
-                version=data.get('VERSION', '').strip('"'),
-                version_id=data.get('VERSION_ID', '').strip('"'),
+                version="9.999",
+                version_id="9.999",
                 variant=data.get('VARIANT', '').strip('"') or None,
                 variant_id=data.get('VARIANT_ID', '').strip('"') or None
             )
