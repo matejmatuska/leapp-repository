@@ -23,7 +23,11 @@ class RepoMapDataHandler(object):
     Provide the basic functionality to work with the repository data easily.
     """
 
-    def __init__(self, repo_map, cloud_provider='', default_channels=None):
+    def __init__(self, repo_map, distro=None, cloud_provider='', default_channels=None):
+        if not distro:
+            self.distro = api.current_actor().configuration.os_release.release_id
+        else:
+            self.distro = distro
         """
         Initialize the object based on the given RepositoriesMapping msg.
 
@@ -103,9 +107,11 @@ class RepoMapDataHandler(object):
         """
         matching_pesid_repos = []
         for pesid_repo in self.repositories:
-            if pesid_repo.repoid == repoid and pesid_repo.major_version == major_version:
+            if pesid_repo.repoid == repoid and pesid_repo.major_version == major_version and pesid_repo.distro == self.distro:
                 matching_pesid_repos.append(pesid_repo)
 
+        # There is no rhui on centos, there should only really be 1 match
+        # FIXME assert len(matching_pesid_repos) <= 1, "Expected only one matching repo in case of a non-rhel distro"
         if len(matching_pesid_repos) == 1:
             # Perform no heuristics if only a single pesid repository with matching repoid found
             return matching_pesid_repos[0]
@@ -149,7 +155,7 @@ class RepoMapDataHandler(object):
         """
         pesid_repos = []
         for pesid_repo in self.repositories:
-            if pesid_repo.pesid == pesid and pesid_repo.major_version == major_version:
+            if pesid_repo.pesid == pesid and pesid_repo.major_version == major_version and pesid_repo.distro == self.distro:
                 pesid_repos.append(pesid_repo)
         return pesid_repos
 
