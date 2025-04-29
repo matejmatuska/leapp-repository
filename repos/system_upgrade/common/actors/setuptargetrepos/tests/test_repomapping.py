@@ -10,7 +10,16 @@ from leapp.libraries.stdlib import api
 from leapp.models import PESIDRepositoryEntry, RepoMapEntry, RepositoriesMapping
 
 
-def make_pesid_repo(pesid, major_version, repoid, arch='x86_64', repo_type='rpm', channel='ga', rhui=''):
+def make_pesid_repo(
+    pesid,
+    major_version,
+    repoid,
+    arch='x86_64',
+    repo_type='rpm',
+    channel='ga',
+    rhui='',
+    distro='rhel',
+):
     """
     PESIDRepositoryEntry factory function allowing shorter data description in tests by providing default values.
     """
@@ -21,7 +30,8 @@ def make_pesid_repo(pesid, major_version, repoid, arch='x86_64', repo_type='rpm'
         arch=arch,
         repo_type=repo_type,
         channel=channel,
-        rhui=rhui
+        rhui=rhui,
+        distro=distro,
     )
 
 
@@ -639,20 +649,26 @@ def test_multiple_repoids_in_repomapping(monkeypatch, rhui):
 
     monkeypatch.setattr(api, 'current_actor', CurrentActorMocked(arch='x86_64', src_ver='7.9', dst_ver='8.6'))
 
-    mk_rhui_el7_pesid_repo = functools.partial(PESIDRepositoryEntry,
-                                               pesid='rhel7-rhui',
-                                               major_version='7',
-                                               repoid='repoid7-rhui',
-                                               repo_type='rpm',
-                                               arch='x86_64',
-                                               channel='ga')
+    mk_rhui_el7_pesid_repo = functools.partial(
+        PESIDRepositoryEntry,
+        pesid='rhel7-rhui',
+        major_version='7',
+        repoid='repoid7-rhui',
+        repo_type='rpm',
+        arch='x86_64',
+        channel='ga',
+        distro='rhel'
+    )
 
-    mk_rhui_el8_pesid_repo = functools.partial(PESIDRepositoryEntry,
-                                               pesid='rhel8-rhui',
-                                               major_version='8',
-                                               repo_type='rpm',
-                                               arch='x86_64',
-                                               channel='ga')
+    mk_rhui_el8_pesid_repo = functools.partial(
+        PESIDRepositoryEntry,
+        pesid='rhel8-rhui',
+        major_version='8',
+        repo_type='rpm',
+        arch='x86_64',
+        channel='ga',
+        distro='rhel',
+    )
 
     repomap = RepositoriesMapping(
         mapping=[RepoMapEntry(source='rhel7-rhui', target=['rhel8-rhui'])],
