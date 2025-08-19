@@ -60,7 +60,7 @@ def test_no_conf(monkeypatch):
 @pytest.mark.skipif(not nmconnscanner.libnm_available, reason="NetworkManager g-ir not installed")
 def test_nm_conn(monkeypatch):
     """
-    Check a basic keyfile
+    Check a basic keyfile and check that secrets are gone
     """
 
     monkeypatch.setattr(nmconnscanner.os, "listdir", _listdir_nm_conn)
@@ -74,18 +74,25 @@ def test_nm_conn(monkeypatch):
     assert isinstance(nm_conn, NetworkManagerConnection)
     assert nm_conn.filename == "/etc/NetworkManager/system-connections/conn1.nmconnection"
     assert len(nm_conn.settings) == 3
-    assert nm_conn.settings[0].name == "connection"
-    assert len(nm_conn.settings[0].properties) == 4
-    assert nm_conn.settings[0].properties[0].name == "id"
-    assert nm_conn.settings[0].properties[0].value == "conn1"
-    assert nm_conn.settings[2].name == "wifi-security"
 
-    # It's important that wek-key0 is gone
-    assert len(nm_conn.settings[2].properties) == 3
-    assert nm_conn.settings[2].properties[0].name == "auth-alg"
-    assert nm_conn.settings[2].properties[0].value == "open"
-    assert nm_conn.settings[2].properties[1].name != "wep-key0"
-    assert nm_conn.settings[2].properties[2].name != "wep-key0"
+    conn_settings = nm_conn.settings[0]
+    assert conn_settings.name == "connection"
+    assert len(conn_settings.properties) == 3
+    # have to iterate, seems like the order of keys within a group is not
+    # preserved
+    for prop in conn_settings.properties:
+        if prop.name == "id":
+            assert prop.value == "conn1"
+
+    wifi_sec_settings = nm_conn.settings[2]
+    assert wifi_sec_settings.name == "wifi-security"
+    assert len(wifi_sec_settings.properties) == 3
+
+    for prop in wifi_sec_settings.properties:
+        # It's important that wek-key0 is gone
+        assert prop.name != "wep-key0"
+        if prop.name == "auth-alg":
+            assert prop.value == "open"
 
 
 @pytest.mark.skipif(not nmconnscanner.libnm_available, reason="NetworkManager g-ir not installed")

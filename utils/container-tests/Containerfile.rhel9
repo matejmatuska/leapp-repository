@@ -3,7 +3,7 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 VOLUME /repo
 
 RUN dnf update -y && \
-    dnf install -y python3-setuptools python3-pip make git rsync
+    dnf install -y python3-setuptools python3-pip make git rsync NetworkManager-libnm
 
 ENV PYTHON_VENV python3.9
 

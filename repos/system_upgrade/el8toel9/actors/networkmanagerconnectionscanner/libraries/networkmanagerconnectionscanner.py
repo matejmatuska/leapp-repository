@@ -25,6 +25,8 @@ NM_CONN_DIR = "/etc/NetworkManager/system-connections"
 def process_file(filename):
     # We're running this through libnm in order to clear the secrets.
     # We don't know what keys are secret, but libnm does.
+    # WARN: seems like either KeyFile or NM keyfile-related functions are not
+    # preserving order of keys within a section (group)
     keyfile = GLib.KeyFile()
     keyfile.load_from_file(filename, GLib.KeyFileFlags.NONE)
     con = NM.keyfile_read(keyfile, NM_CONN_DIR, NM.KeyfileHandlerFlags.NONE)
