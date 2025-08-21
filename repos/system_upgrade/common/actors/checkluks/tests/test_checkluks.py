@@ -6,7 +6,7 @@ from leapp.models import (
     LuksDumps,
     LuksToken,
     TargetUserSpaceUpgradeTasks,
-    UpgradeInitramfsTasks,
+    UpgradeInitramfsTasks
 )
 from leapp.reporting import Report
 from leapp.snactor.fixture import current_actor_context

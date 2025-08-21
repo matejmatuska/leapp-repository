@@ -1,13 +1,7 @@
 from leapp import reporting
 from leapp.libraries.common.config.version import get_source_major_version
 from leapp.libraries.stdlib import api
-from leapp.models import (
-    CephInfo,
-    DracutModule,
-    LuksDumps,
-    TargetUserSpaceUpgradeTasks,
-    UpgradeInitramfsTasks
-)
+from leapp.models import CephInfo, DracutModule, LuksDumps, TargetUserSpaceUpgradeTasks, UpgradeInitramfsTasks
 from leapp.reporting import create_report
 
 # https://red.ht/clevis-tpm2-luks-auto-unlock-rhel8
