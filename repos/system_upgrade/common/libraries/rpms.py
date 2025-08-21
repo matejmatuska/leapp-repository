@@ -19,29 +19,29 @@ class LeappComponents(object):
 
 
 _LEAPP_PACKAGES_MAP = {
-        LeappComponents.FRAMEWORK: {'7': {'pkgs': ['leapp', 'python2-leapp'],
-                                          'deps': ['leapp-deps']},
-                                    '8': {'pkgs': ['leapp', 'python3-leapp'],
-                                          'deps': ['leapp-deps']},
-                                    '9': {'pkgs': ['leapp', 'python3-leapp'],
-                                          'deps': ['leapp-deps']}
-                                    },
-        LeappComponents.REPOSITORY: {'7': {'pkgs': ['leapp-upgrade-el7toel8'],
-                                           'deps': ['leapp-upgrade-el7toel8-deps']},
-                                     '8': {'pkgs': ['leapp-upgrade-el8toel9', 'leapp-upgrade-el8toel9-fapolicyd'],
-                                           'deps': ['leapp-upgrade-el8toel9-deps']},
-                                     '9': {'pkgs': ['leapp-upgrade-el9toel10', 'leapp-upgrade-el9toel10-fapolicyd'],
-                                           'deps': ['leapp-upgrade-el9toel10-deps']}
-                                     },
-        LeappComponents.COCKPIT: {'7': {'pkgs': ['cockpit-leapp']},
-                                  '8': {'pkgs': ['cockpit-leapp']},
-                                  '9': {'pkgs': ['cockpit-leapp']},
-                                  },
-        LeappComponents.TOOLS: {'7': {'pkgs': ['snactor']},
-                                '8': {'pkgs': ['snactor']},
-                                '9': {'pkgs': ['snactor']}
-                                }
-        }
+    LeappComponents.FRAMEWORK: {
+        "8": {"pkgs": ["leapp", "python3-leapp"], "deps": ["leapp-deps"]},
+        "9": {"pkgs": ["leapp", "python3-leapp"], "deps": ["leapp-deps"]},
+    },
+    LeappComponents.REPOSITORY: {
+        "8": {
+            "pkgs": ["leapp-upgrade-el8toel9", "leapp-upgrade-el8toel9-fapolicyd"],
+            "deps": ["leapp-upgrade-el8toel9-deps"],
+        },
+        "9": {
+            "pkgs": ["leapp-upgrade-el9toel10", "leapp-upgrade-el9toel10-fapolicyd"],
+            "deps": ["leapp-upgrade-el9toel10-deps"],
+        },
+    },
+    LeappComponents.COCKPIT: {
+        "8": {"pkgs": ["cockpit-leapp"]},
+        "9": {"pkgs": ["cockpit-leapp"]},
+    },
+    LeappComponents.TOOLS: {
+        "8": {"pkgs": ["snactor"]},
+        "9": {"pkgs": ["snactor"]},
+    },
+}
 
 GET_LEAPP_PACKAGES_DEFAULT_COMPONENTS = frozenset((LeappComponents.FRAMEWORK,
                                                    LeappComponents.REPOSITORY,
