@@ -1,4 +1,5 @@
 import os
+import unittest.mock as mock
 
 import pytest
 
@@ -121,6 +122,46 @@ def test_get_obsolete_keys_incomplete_data(
 
 
 @pytest.mark.parametrize(
+    "distro, expected",
+    [
+        (
+            "centos",
+            [
+                "gpg-pubkey-8483c65d-5ccc5b19",
+                "gpg-pubkey-1d997668-621e3cac",
+                "gpg-pubkey-1d997668-61bae63b",
+            ],
+        ),
+        (
+            "rhel",
+            [
+                "gpg-pubkey-fd431d51-4ae0493b",
+                "gpg-pubkey-37017186-45761324",
+                "gpg-pubkey-f21541eb-4a5233e8",
+                "gpg-pubkey-897da07a-3c979a7f",
+                "gpg-pubkey-2fa658e0-45700c69",
+                "gpg-pubkey-d4082792-5b32db75",
+                "gpg-pubkey-5a6340b3-6229229e",
+                "gpg-pubkey-db42a60e-37ea5438",
+            ],
+        ),
+    ],
+)
+def test_get_source_distro_keys(monkeypatch, distro, expected):
+    """
+    Test that the correct keys are returned for each distro.
+    """
+    monkeypatch.setattr(api, "current_actor", CurrentActorMocked(src_distro=distro))
+    monkeypatch.setattr(api, "get_common_folder_path", common_folder_path_mocked)
+    monkeypatch.setattr(
+        removeobsoleterpmgpgkeys, "_is_key_installed", lambda _key: True
+    )
+
+    keys = removeobsoleterpmgpgkeys._get_source_distro_keys()
+    assert set(keys) == set(expected)
+
+
+@pytest.mark.parametrize(
     "keys, should_register",
     [
         (["gpg-pubkey-d4082792-5b32db75"], True),
@@ -136,3 +177,47 @@ def test_workaround_should_register(monkeypatch, keys, should_register):
 
     removeobsoleterpmgpgkeys.process()
     assert api.produce.called == should_register
+
+
+def test_process(monkeypatch):
+    """
+    Test that the correct path is taken depending on whether also converting
+    """
+    obsolete = ["gpg-pubkey-12345678-abcdefgh"]
+    source_distro = ["gpg-pubkey-87654321-hgfedcba"]
+
+    monkeypatch.setattr(
+        removeobsoleterpmgpgkeys, "_get_obsolete_keys", lambda: obsolete
+    )
+    monkeypatch.setattr(
+        removeobsoleterpmgpgkeys, "_get_source_distro_keys", lambda: source_distro,
+    )
+
+    # upgrade only path
+    monkeypatch.setattr(
+        api, "current_actor", CurrentActorMocked(src_distro="rhel", dst_distro="rhel")
+    )
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            obsolete
+        )
+
+    # upgrade + conversion paths
+    monkeypatch.setattr(
+        api, "current_actor", CurrentActorMocked(src_distro="rhel", dst_distro="centos")
+    )
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            source_distro
+        )
+
+    monkeypatch.setattr(
+        api, "current_actor", CurrentActorMocked(src_distro="centos", dst_distro="rhel")
+    )
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            source_distro
+        )
