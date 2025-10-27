@@ -103,8 +103,12 @@ def get_virtual_version(all_upgrade_path_defs, distro, version):
 
     virtual_versions = centos_upgrade_paths.get(CENTOS_VIRTUAL_VERSIONS_KEY, {})
     if not virtual_versions:  # Unlikely, only if using old upgrade_paths.json, but the user should not touch the file
-        details = {'details': 'The file does not contain any information about virtual versions of CentOS'}
-        raise StopActorExecutionError('The internal upgrade_paths.json file is invalid.')
+        details = {
+            "details": "The file does not contain any information about virtual versions of CentOS"
+        }
+        raise StopActorExecutionError(
+            "The internal upgrade_paths.json file is invalid.", details=details
+        )
 
     virtual_version = virtual_versions.get(version)
     if not virtual_version:
@@ -112,8 +116,10 @@ def get_virtual_version(all_upgrade_path_defs, distro, version):
             'The {} field in upgrade path definitions for \'centos\' does not'
             ' provide any virtual version for version {}'
         ).format(CENTOS_VIRTUAL_VERSIONS_KEY, version)
-        raise StopActorExecutionError('Failed to identify virtual minor version number for the system.',
-                                      details=details)
+        raise StopActorExecutionError(
+            "Failed to identify virtual minor version number for the system.",
+            details={"details": details},
+        )
     return virtual_version
 
 
