@@ -304,5 +304,5 @@ def load_actor_configs_and_store_it_in_db(context, repositories, framework_cfg):
     db_config.store()
 
 
-def get_target_os_options():
+def get_available_target_distro_ids():
     return [member.value for member in DistroIDs]

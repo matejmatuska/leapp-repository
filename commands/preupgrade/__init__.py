@@ -48,7 +48,7 @@ from leapp.utils.output import beautify_actor_exception, report_errors, report_i
     'target-os',
     help='Specify the OS to upgrade to. If this differs from the OS on the'
          ' source system, a conversion is performed during the upgrade.',
-    choices=command_utils.get_target_os_options(),
+    choices=command_utils.get_available_target_distro_ids(),
     default=command_utils.get_source_distro_id(),
 )
 @command_opt('report-schema', help='Specify report schema version for leapp-report.json',
