@@ -23,7 +23,14 @@ class RepoMapDataHandler:
     Provide the basic functionality to work with the repository data easily.
     """
 
-    def __init__(self, repo_map, src_distro='', dst_distro='', cloud_provider='', default_channels=None):
+    def __init__(
+        self,
+        repo_map,
+        source_distro="",
+        target_distro="",
+        cloud_provider="",
+        default_channels=None,
+    ):
         """
         Initialize the object based on the given RepositoriesMapping msg.
 
@@ -32,10 +39,10 @@ class RepoMapDataHandler:
 
         :param repo_map: A valid RepositoryMapping message.
         :type repo_map: RepositoryMapping
-        :param src_distro: The distribution to map repos from, default to current
-        :type src_distro: str
-        :param dst_distro: The distribution to map repos to, default to current
-        :type dst_distro: str
+        :param source_distro: The distribution to map repos from, default to current
+        :type source_distro: str
+        :param target_distro: The distribution to map repos to, default to current target distro
+        :type target_distro: str
         :param default_channels: A list of default channels to use when a target repository
                                  equivalent exactly matching a source repository was not found.
         :type default_channels: List[str]
@@ -47,8 +54,8 @@ class RepoMapDataHandler:
         self.repositories = repo_map.repositories
         self.mapping = repo_map.mapping
 
-        self.src_distro = src_distro or get_source_distro_id()
-        self.dst_distro = dst_distro or get_target_distro_id()
+        self.source_distro = source_distro or get_source_distro_id()
+        self.target_distro = target_distro or get_target_distro_id()
         # FIXME(pstodulk): what about default_channel -> fallback_channel
         # hardcoded always as ga? instead of list of channels..
         # it'd be possibly confusing naming now...
@@ -195,7 +202,7 @@ class RepoMapDataHandler:
                  the OS Major version same as the source OS.
         :rtype: List[PESIDRepositoryEntry]
         """
-        return self.get_pesid_repos(pesid, get_source_major_version(), self.src_distro)
+        return self.get_pesid_repos(pesid, get_source_major_version(), self.source_distro)
 
     def get_target_pesid_repos(self, pesid):
         """
@@ -208,7 +215,7 @@ class RepoMapDataHandler:
                  the OS Major version same as the target OS.
         :rtype: List[PESIDRepositoryEntry]
         """
-        return self.get_pesid_repos(pesid, get_target_major_version(), self.dst_distro)
+        return self.get_pesid_repos(pesid, get_target_major_version(), self.target_distro)
 
     def _find_repository_target_equivalent(self, src_pesidrepo, target_pesid):
         """
@@ -228,7 +235,7 @@ class RepoMapDataHandler:
             matches_rhui = candidate.rhui == src_pesidrepo.rhui
             matches_repo_type = candidate.repo_type == 'rpm'
             matches_arch = candidate.arch == api.current_actor().configuration.architecture
-            matches_distro = candidate.distro == self.dst_distro
+            matches_distro = candidate.distro == self.target_distro
 
             if matches_rhui and matches_arch and matches_distro and matches_repo_type:
                 # user can specify in future the specific channel should be
@@ -300,7 +307,7 @@ class RepoMapDataHandler:
         # {pesid: target_repo}
         target_repos_best_candidates = {}
         for src_repoid in src_repoids:
-            src_pesidrepo = self.get_pesid_repo_entry(src_repoid, get_source_major_version(), self.src_distro)
+            src_pesidrepo = self.get_pesid_repo_entry(src_repoid, get_source_major_version(), self.source_distro)
             if not src_pesidrepo:
                 # unmapped or custom repo -> skip this one
                 continue
@@ -345,7 +352,9 @@ def get_default_repository_channels(repomap, src_repoids):
     default_pesid = DEFAULT_PESID[get_source_major_version()]
     top_prio_pesid_repo = None
     for repoid in src_repoids:
-        pesid_repo = repomap.get_pesid_repo_entry(repoid, get_source_major_version(), get_source_distro_id())
+        pesid_repo = repomap.get_pesid_repo_entry(
+            repoid, get_source_major_version(), get_source_distro_id()
+        )
         if not pesid_repo or pesid_repo.pesid != default_pesid:
             continue
         if not top_prio_pesid_repo or _get_channel_prio(pesid_repo) > _get_channel_prio(top_prio_pesid_repo):
