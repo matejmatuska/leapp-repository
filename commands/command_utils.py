@@ -62,9 +62,9 @@ def assert_version_format(version_str, desired_format, version_kind):
     """
     if not re.match(desired_format.regex, version_str):
         error_str = (
-            'Unexpected format of {} version: {}. The required format is \'{}\'.'
-        )
-        raise CommandError(error_str.format(version_kind, version_str, desired_format.human_readable))
+            "Unexpected format of {} version: {}. The required format is '{}'."
+        ).format(version_kind.value, version_str, desired_format.human_readable)
+        raise CommandError(error_str)
 
 
 def get_major_version_from_a_valid_version(version):
@@ -228,13 +228,15 @@ def get_target_release(args):
     env_version_override = os.getenv('LEAPP_DEVEL_TARGET_RELEASE')
 
     target_ver = env_version_override or args.target_version
-    distro_id = os.getenv('LEAPP_TARGET_OS')
+    target_distro_id = os.getenv('LEAPP_TARGET_OS')
     if target_ver:
-        expected_version_format = _DISTRO_VERSION_FORMATS.get(distro_id, VersionFormats.MAJOR_MINOR)
+        expected_version_format = _DISTRO_VERSION_FORMATS.get(
+            target_distro_id, VersionFormats.MAJOR_MINOR
+        )
         assert_version_format(target_ver, expected_version_format.value, _VersionKind.TARGET)
         return (target_ver, flavor)
 
-    return (get_target_version(flavor, distro_id), flavor)
+    return (get_target_version(flavor, target_distro_id), flavor)
 
 
 def set_resource_limits():
