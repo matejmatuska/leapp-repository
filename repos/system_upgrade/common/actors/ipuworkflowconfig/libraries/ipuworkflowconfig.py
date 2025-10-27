@@ -210,9 +210,10 @@ def _centos_to_rhel_supported_version_workaround(exposed_supported_paths):
     :type exposed_supported_paths: list[IPUSourceToPossibleTargets]
     """
 
-    assert (
-        len(exposed_supported_paths) == 1
-    ), "Expected only 1 IPUSourceToPossibleTargets on CS->RHEL upgrade"
+    if len(exposed_supported_paths) != 1:
+        raise StopActorExecutionError(
+            "Expected only 1 IPUSourceToPossibleTargets model on CS->RHEL upgrade"
+        )
     path = exposed_supported_paths[0]
 
     major, minor = max(path.target_versions).split('.')
