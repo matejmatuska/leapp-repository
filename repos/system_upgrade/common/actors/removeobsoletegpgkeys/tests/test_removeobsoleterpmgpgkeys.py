@@ -197,18 +197,27 @@ def test_process(monkeypatch):
     monkeypatch.setattr(
         api, "current_actor", CurrentActorMocked(src_distro="rhel", dst_distro="rhel")
     )
-    mock.patch('removeobsoleterpmgpgkeys.register_dnfworkaround')
-    removeobsoleterpmgpgkeys.process()
-    removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
-        obsolete
-    )
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            obsolete
+        )
 
-    # upgrade + conversion path
+    # upgrade + conversion paths
     monkeypatch.setattr(
         api, "current_actor", CurrentActorMocked(src_distro="rhel", dst_distro="centos")
     )
-    mock.patch('removeobsoleterpmgpgkeys.register_dnfworkaround')
-    removeobsoleterpmgpgkeys.process()
-    removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
-        source_distro
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            source_distro
+        )
+
+    monkeypatch.setattr(
+        api, "current_actor", CurrentActorMocked(src_distro="centos", dst_distro="rhel")
     )
+    with mock.patch('leapp.libraries.actor.removeobsoleterpmgpgkeys.register_dnfworkaround'):
+        removeobsoleterpmgpgkeys.process()
+        removeobsoleterpmgpgkeys.register_dnfworkaround.assert_called_once_with(
+            source_distro
+        )
