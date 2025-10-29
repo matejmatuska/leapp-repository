@@ -12,7 +12,6 @@ from leapp.models import (
     PCIAddress,
     PersistentNetNamesFacts,
     PersistentNetNamesFactsInitramfs,
-    RenamedInterface,
     RenamedInterfaces,
     TargetInitramfsTasks
 )
