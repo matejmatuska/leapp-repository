@@ -135,6 +135,9 @@ _CONFIG = {
             "centos-release-samba418",
             "centos-release-samba419",
             "centos-release-samba420",
+
+            "elrepo-release",
+            "epel-release",
         },
     },
 }
