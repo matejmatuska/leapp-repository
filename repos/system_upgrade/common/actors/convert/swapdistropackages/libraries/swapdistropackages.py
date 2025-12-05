@@ -1,9 +1,19 @@
+import fnmatch
+
+from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common.config import get_source_distro_id, get_target_distro_id
 from leapp.libraries.common.config.version import get_target_major_version
-from leapp.libraries.common.rpms import has_package
 from leapp.libraries.stdlib import api
 from leapp.models import DistributionSignedRPM, RpmTransactionTasks
 
+# Config for swapping distribution-specific RPMs
+# The keys can be in 2 "formats":
+#     (<source_distro_id>, <target_distro_id>)
+#     (<source_distro_id>, <target_distro_id>, <target_major_version as int>)
+# The "swap" dict maps packages on the source distro to their replacements on
+# the target distro
+# The "remove" set lists packages or glob pattern for matching packages from
+# the source distro to remove without any replacement.
 _CONFIG = {
     ("centos", "rhel"): {
         "swap": {
@@ -18,62 +28,7 @@ _CONFIG = {
             "centos-gpg-keys",
             "centos-stream-repos",
             # various release packages, typically contain repofiles
-            "centos-release-automotive",
-            "centos-release-automotive-experimental",
-            "centos-release-autosd",
-            "centos-release-ceph-pacific",
-            "centos-release-ceph-quincy",
-            "centos-release-ceph-reef",
-            "centos-release-ceph-squid",
-            "centos-release-ceph-tentacle",
-            "centos-release-cloud",
-            "centos-release-gluster10",
-            "centos-release-gluster11",
-            "centos-release-gluster9",
-            "centos-release-hyperscale",
-            "centos-release-hyperscale-experimental",
-            "centos-release-hyperscale-experimental-testing",
-            "centos-release-hyperscale-spin",
-            "centos-release-hyperscale-spin-testing",
-            "centos-release-hyperscale-testing",
-            "centos-release-isa-override",
-            "centos-release-kmods",
-            "centos-release-kmods-kernel",
-            "centos-release-kmods-kernel-6",
-            "centos-release-messaging",
-            "centos-release-nfs-ganesha4",
-            "centos-release-nfs-ganesha5",
-            "centos-release-nfs-ganesha6",
-            "centos-release-nfs-ganesha7",
-            "centos-release-nfs-ganesha8",
-            "centos-release-nfv-common",
-            "centos-release-nfv-openvswitch",
-            "centos-release-okd-4",
-            "centos-release-openstack-antelope",
-            "centos-release-openstack-bobcat",
-            "centos-release-openstack-caracal",
-            "centos-release-openstack-dalmatian",
-            "centos-release-openstack-epoxy",
-            "centos-release-openstack-yoga",
-            "centos-release-openstack-zed",
-            "centos-release-openstackclient-xena",
-            "centos-release-opstools",
-            "centos-release-ovirt45",
-            "centos-release-ovirt45-testing",
-            "centos-release-proposed_updates",
-            "centos-release-rabbitmq-38",
-            "centos-release-samba414",
-            "centos-release-samba415",
-            "centos-release-samba416",
-            "centos-release-samba417",
-            "centos-release-samba418",
-            "centos-release-samba419",
-            "centos-release-samba420",
-            "centos-release-samba421",
-            "centos-release-samba422",
-            "centos-release-samba423",
-            "centos-release-storage-common",
-            "centos-release-virt-common",
+            "centos-release-*",
             # present on Centos (not Stream) 8, let's include them if they are potentially leftover
             "centos-linux-release",
             "centos-linux-repos",
@@ -82,60 +37,19 @@ _CONFIG = {
     },
     ("almalinux", "rhel"): {
         "swap": {
-                "almalinux-logos": "redhat-logos",
-                "almalinux-logos-httpd": "redhat-logos-httpd",
-                "almalinux-logos-ipa": "redhat-logos-ipa",
-                "almalinux-indexhtml": "redhat-indexhtml",
-                "almalinux-backgrouns": "redhat-backgrounds",
-                "almalinux-release": "redhat-release",
+            "almalinux-logos": "redhat-logos",
+            "almalinux-logos-httpd": "redhat-logos-httpd",
+            "almalinux-logos-ipa": "redhat-logos-ipa",
+            "almalinux-indexhtml": "redhat-indexhtml",
+            "almalinux-backgrouns": "redhat-backgrounds",
+            "almalinux-release": "redhat-release",
         },
         "remove": {
-            "almalinux-release-devel"
-            "almalinux-release-nvidia-driver"
-            "almalinux-release-opennebula-addons"
-            "almalinux-release-synergy"
-            "almalinux-release-testing"
-
             "almalinux-repos",
             "almalinux-gpg-keys",
 
-            "centos-release-cloud",
-            "centos-release-nfv-openvswitch",
-            "centos-release-storage-common",
-            "centos-release-virt-common",
-            "centos-release-ceph-pacific",
-            "centos-release-ceph-quincy",
-            "centos-release-ceph-reef",
-            "centos-release-gluster10",
-            "centos-release-gluster11",
-            "centos-release-gluster9",
-            "centos-release-messaging",
-            "centos-release-nfs-ganesha4",
-            "centos-release-nfs-ganesha5",
-            "centos-release-nfv-common",
-            "centos-release-okd-4.13",
-            "centos-release-okd-4.14",
-            "centos-release-okd-4.15",
-            "centos-release-okd-4.16",
-            "centos-release-openstack-antelope",
-            "centos-release-openstack-bobcat",
-            "centos-release-openstack-caracal",
-            "centos-release-openstack-dalmatian",
-            "centos-release-openstack-yoga",
-            "centos-release-openstack-zed",
-            "centos-release-openstackclient-xena",
-            "centos-release-opstools",
-            "centos-release-ovirt45",
-            "centos-release-ovirt45-testing",
-            "centos-release-rabbitmq-38",
-            "centos-release-samba414",
-            "centos-release-samba415",
-            "centos-release-samba416",
-            "centos-release-samba417",
-            "centos-release-samba418",
-            "centos-release-samba419",
-            "centos-release-samba420",
-
+            "almalinux-release-*",
+            "centos-release-*",
             "elrepo-release",
             "epel-release",
         },
@@ -153,25 +67,30 @@ def _get_config(source_distro, target_distro, target_major):
     return _CONFIG.get(key)
 
 
-def _make_transaction_tasks(config):
-    to_install = []
-    to_remove = []
+def _glob_match_rpms(rpms, pattern):
+    return [rpm for rpm in rpms if fnmatch.fnmatch(rpm, pattern)]
+
+
+def _make_transaction_tasks(config, rpms):
+    to_install = set()
+    to_remove = set()
     for source_pkg, target_pkg in config.get("swap", {}).items():
-        if has_package(DistributionSignedRPM, source_pkg):
-            to_remove.append(source_pkg)
-            to_install.append(target_pkg)
+        if source_pkg in rpms:
+            to_remove.add(source_pkg)
+            to_install.add(target_pkg)
 
     for pkg in config.get("remove", {}):
-        # this has_package call isn't strictly necessary as the actor
-        # processing RpmTransactionTasks checks if the package is present, but
-        # keeping it for consistency with the above
-        if has_package(DistributionSignedRPM, pkg):
-            to_remove.append(pkg)
+        matches = _glob_match_rpms(rpms, pkg)
+        to_remove.update(matches)
 
-    return RpmTransactionTasks(to_install=to_install, to_remove=to_remove)
+    return RpmTransactionTasks(to_install=list(to_install), to_remove=list(to_remove))
 
 
 def process():
+    rpms_msg = next(api.consume(DistributionSignedRPM), None)
+    if not rpms_msg:
+        raise StopActorExecutionError("Did not receive DistributionSignedRPM message")
+
     source_distro = get_source_distro_id()
     target_distro = get_target_distro_id()
 
@@ -187,5 +106,6 @@ def process():
         )
         return
 
-    task = _make_transaction_tasks(config)
+    rpms = {rpm.name for rpm in rpms_msg.items}
+    task = _make_transaction_tasks(config, rpms)
     api.produce(task)
