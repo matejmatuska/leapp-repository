@@ -80,6 +80,63 @@ _CONFIG = {
             "centos-obsolete-packages",
         },
     },
+    ("almalinux", "rhel"): {
+        "swap": {
+                "almalinux-logos": "redhat-logos",
+                "almalinux-logos-httpd": "redhat-logos-httpd",
+                "almalinux-logos-ipa": "redhat-logos-ipa",
+                "almalinux-indexhtml": "redhat-indexhtml",
+                "almalinux-backgrouns": "redhat-backgrounds",
+                "almalinux-release": "redhat-release",
+        },
+        "remove": {
+            "almalinux-release-devel"
+            "almalinux-release-nvidia-driver"
+            "almalinux-release-opennebula-addons"
+            "almalinux-release-synergy"
+            "almalinux-release-testing"
+
+            "almalinux-repos",
+            "almalinux-gpg-keys",
+
+            "centos-release-cloud",
+            "centos-release-nfv-openvswitch",
+            "centos-release-storage-common",
+            "centos-release-virt-common",
+            "centos-release-ceph-pacific",
+            "centos-release-ceph-quincy",
+            "centos-release-ceph-reef",
+            "centos-release-gluster10",
+            "centos-release-gluster11",
+            "centos-release-gluster9",
+            "centos-release-messaging",
+            "centos-release-nfs-ganesha4",
+            "centos-release-nfs-ganesha5",
+            "centos-release-nfv-common",
+            "centos-release-okd-4.13",
+            "centos-release-okd-4.14",
+            "centos-release-okd-4.15",
+            "centos-release-okd-4.16",
+            "centos-release-openstack-antelope",
+            "centos-release-openstack-bobcat",
+            "centos-release-openstack-caracal",
+            "centos-release-openstack-dalmatian",
+            "centos-release-openstack-yoga",
+            "centos-release-openstack-zed",
+            "centos-release-openstackclient-xena",
+            "centos-release-opstools",
+            "centos-release-ovirt45",
+            "centos-release-ovirt45-testing",
+            "centos-release-rabbitmq-38",
+            "centos-release-samba414",
+            "centos-release-samba415",
+            "centos-release-samba416",
+            "centos-release-samba417",
+            "centos-release-samba418",
+            "centos-release-samba419",
+            "centos-release-samba420",
+        },
+    },
 }
 
 
