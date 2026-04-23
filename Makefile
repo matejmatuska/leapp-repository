@@ -254,7 +254,7 @@ _build_local: source
 	@mv packaging/$(PKGNAME).spec.bak packaging/$(PKGNAME).spec
 
 build_container:
-	echo "--- Build RPM ${PKGNAME}-${VERSION}-${RELEASE}.el$(DIST_VERSION).rpm in container ---";
+	@echo "--- Build RPM ${PKGNAME}-${VERSION}-${RELEASE}.el$(DIST_VERSION).rpm in container ---";
 	case "$(BUILD_CONTAINER)" in \
 		el8) \
 			CONT_FILE="utils/container-builds/Containerfile.el8"; \
