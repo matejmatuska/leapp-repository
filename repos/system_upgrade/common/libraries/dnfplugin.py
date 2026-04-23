@@ -289,6 +289,32 @@ def _transaction(context, stage, target_repoids, tasks, plugin_info, xfs_info,
             DNF_PLUGIN_DATA_PATH
         ]
         try:
+            # required so that the transaction passes -> all the keys have to be imported using the RHEL 10 rpm(keys)
+            context.call(
+                cmd=['/usr/bin/rpmkeys', '--import', '--root', '/installroot', '/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release', '/etc/pki/rpm-gpg/RPM-GPG-KEY-PQC-redhat-release'],
+                callback_raw=utils.logging_handler,
+                env=env
+            )
+            # debug print
+            context.call(
+                cmd=['/usr/bin/rpmkeys', '--list', '--root', '/installroot'],
+                callback_raw=utils.logging_handler,
+                env=env
+            )
+            # this one is required so that installation of initramfs deps passes,
+            # while the keys are already imported there (in the target uspace) using the dnf workaround,
+            # this needs to be done using the RHEL 10 rpm(keys)
+            context.call(
+                cmd=['/usr/bin/rpmkeys', '--import', '/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release', '/etc/pki/rpm-gpg/RPM-GPG-KEY-PQC-redhat-release'],
+                callback_raw=utils.logging_handler,
+                env=env
+            )
+            # debug print
+            context.call(
+                cmd=['/usr/bin/rpmkeys', '--list'],
+                callback_raw=utils.logging_handler,
+                env=env
+            )
             context.call(
                 cmd=cmd_prefix + cmd + common_params,
                 callback_raw=utils.logging_handler,
@@ -521,6 +547,7 @@ def perform_rpm_download(target_userspace_info,
 
         apply_workarounds(overlay.nspawn())
         dnfconfig.exclude_leapp_rpms(context, disable_plugins)
+        import pdb; pdb.set_trace()
         _transaction(
             context=context, stage='download', target_repoids=target_repoids, plugin_info=plugin_info, tasks=tasks,
             test=True, on_aws=on_aws, xfs_info=xfs_info

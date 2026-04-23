@@ -166,8 +166,19 @@ def _import_gpg_keys(context, install_root_dir, target_major_version):
     try:
         # Import also any other keys provided by the customer in the same directory
         for certname in os.listdir(certs_path):
-            cmd = ['rpm', '--root', install_root_dir, '--import', os.path.join(certs_path, certname)]
+            cmd = [
+                "/usr/lib/pqrpm/bin/rpmkeys",
+                "--root", install_root_dir,
+                "--import", os.path.join(certs_path, certname),
+            ]
             context.call(cmd, callback_raw=utils.logging_handler)
+            if not "pqc" in certname.lower():
+                cmd = [
+                    "rpm",
+                    "--root", install_root_dir,
+                    "--import", os.path.join(certs_path, certname),
+                ]
+                context.call(cmd, callback_raw=utils.logging_handler)
     except CalledProcessError as exc:
         raise StopActorExecutionError(
             message=(
