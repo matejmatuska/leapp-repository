@@ -163,7 +163,10 @@ class RepoMapDataHandler:
         pesids = set()
         for repomap in self.mapping:
             if repomap.source == source_pesid:
-                pesids.update(repomap.target)
+                default = repomap.target.default
+                target_for_distro = repomap.target.get(self.target_distro, default)
+                pesids.update(target_for_distro)
+
         return sorted(pesids)
 
     def get_pesid_repos(self, pesid, major_version, distro):
