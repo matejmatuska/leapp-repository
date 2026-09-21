@@ -18,6 +18,8 @@ Only the versions in which a deprecation has been made are listed.
 `os_version` field.
 - **`TMPTargetRepositoriesFacts`** - The model, deprecated since v0.11.0, has been removed.
 It is replaced by the `RepositoriesFactsTarget` model providing the same data.
+- **`RequiredTargetUserspacePackages`** - The model, deprecated since v0.15.0, has been removed.
+Use the `TargetUserSpacePreupgradeTasks` model instead (see the `install_rpms` field).
 
 ## v0.25.0 <span style="font-size:0.5em; font-weight:normal">(till January 2027)</span>
 - Environment variables
