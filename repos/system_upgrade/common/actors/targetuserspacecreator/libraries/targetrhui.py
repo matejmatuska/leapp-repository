@@ -10,8 +10,8 @@ inside the scratch container.
 import os
 
 from leapp.exceptions import StopActorExecutionError
-from leapp.libraries.actor import bootstrap, repoaccess
-from leapp.libraries.common import repofileutils, utils
+from leapp.libraries.actor import bootstrap, repoaccess, repofiles
+from leapp.libraries.common import utils
 from leapp.libraries.common.config.version import get_target_major_version
 from leapp.libraries.stdlib import api, CalledProcessError
 
@@ -173,15 +173,7 @@ def setup_target_rhui_access_if_needed(context, indata):
         copied_repofiles = [copy.src for copy in copy_tasks if copy.src.endswith('.repo')]
         copied_repoids = set()
         for repofile in copied_repofiles:
-            try:
-                repofile_contents = repofileutils.parse_repofile(repofile)
-            except repofileutils.InvalidRepoDefinition as e:
-                raise StopActorExecutionError(
-                    message="Failed to parse repositories for RHUI: {}".format(str(e)),
-                    details={
-                        'hint': 'Ensure the repository definition is correct or remove it '
-                                'if the repository is not required for the upgrade.'
-                    })
+            repofile_contents = repofiles.parse_repofile_or_stop(repofile, 'Failed to parse repositories for RHUI')
             copied_repoids.update(entry.repoid for entry in repofile_contents.data)
 
         cmd += ['--disablerepo', '*']

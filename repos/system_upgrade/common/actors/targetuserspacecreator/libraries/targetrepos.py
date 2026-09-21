@@ -6,7 +6,7 @@ import os
 
 from leapp import reporting
 from leapp.exceptions import StopActorExecution, StopActorExecutionError
-from leapp.libraries.actor import targetrhui
+from leapp.libraries.actor import repofiles, targetrhui
 from leapp.libraries.common import distro, repofileutils, rhsm
 from leapp.libraries.common.config import get_source_distro_id, get_target_distro_id, is_conversion
 from leapp.libraries.common.config.version import get_source_major_version, get_target_major_version
@@ -15,7 +15,7 @@ from leapp.models import RHELTargetRepository, TargetRepositories
 from leapp.utils.deprecation import suppress_deprecation
 
 
-def _inhibit_on_duplicate_repos(repofiles):
+def _inhibit_on_duplicate_repos(parsed_repofiles):
     """
     Inhibit the upgrade if any repoid is defined multiple times.
 
@@ -24,7 +24,7 @@ def _inhibit_on_duplicate_repos(repofiles):
     """
     # TODO: this is is duplicate of rhsm._inhibit_on_duplicate_repos
     # Issue: #486
-    duplicates = repofileutils.get_duplicate_repositories(repofiles).keys()
+    duplicates = repofileutils.get_duplicate_repositories(parsed_repofiles).keys()
 
     if not duplicates:
         return
@@ -52,24 +52,16 @@ def _inhibit_on_duplicate_repos(repofiles):
     ])
 
 
-def _get_all_available_repoids(context):
-    try:
-        repofiles = repofileutils.get_parsed_repofiles(context)
-    except repofileutils.InvalidRepoDefinition as e:
-        raise StopActorExecutionError(
-            message="Failed to parse available repoids: {}".format(str(e)),
-            details={
-                'hint': 'Ensure the repository definition is correct or remove it '
-                        'if the repository is not required for the upgrade.'
-            })
-    # TODO: this is not good solution, but keep it as it is now
-    # Issue: #486
-    if rhsm.skip_rhsm():
-        # only if rhsm is skipped, the duplicate repos are not detected
-        # automatically and we need to do it extra
-        _inhibit_on_duplicate_repos(repofiles)
+def _get_all_available_repoids(parsed_repofiles):
+    """
+    Get all repoids defined in the given (parsed) repofiles.
+
+    :param parsed_repofiles: the parsed repofiles available in the container
+    :type parsed_repofiles: list(RepositoryFile)
+    :rtype: set[str]
+    """
     repoids = []
-    for rfile in repofiles:
+    for rfile in parsed_repofiles:
         if rfile.data:
             repoids += [repo.repoid for repo in rfile.data]
     return set(repoids)
@@ -196,7 +188,14 @@ def gather_target_repositories(context, indata):
             )
         )
 
-    all_repoids = _get_all_available_repoids(context)
+    parsed_repofiles = repofiles.get_parsed_repofiles_or_stop(context, 'Failed to parse available repoids')
+    # TODO: this is not good solution, but keep it as it is now
+    # Issue: #486
+    if rhsm.skip_rhsm():
+        # only if rhsm is skipped, the duplicate repos are not detected
+        # automatically and we need to do it extra
+        _inhibit_on_duplicate_repos(parsed_repofiles)
+    all_repoids = _get_all_available_repoids(parsed_repofiles)
 
     target_repoids = set()
     missing_custom_repoids = set()

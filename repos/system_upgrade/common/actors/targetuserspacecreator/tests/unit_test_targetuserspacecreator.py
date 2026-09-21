@@ -10,7 +10,7 @@ import pytest
 
 from leapp import models, reporting
 from leapp.exceptions import StopActorExecution, StopActorExecutionError
-from leapp.libraries.actor import inputdata, repoaccess, targetrepos, targetrhui, userspacegen
+from leapp.libraries.actor import inputdata, repoaccess, repofiles, targetrepos, targetrhui, userspacegen
 from leapp.libraries.common import distro, overlaygen, repofileutils, rhsm
 from leapp.libraries.common.config import architecture
 from leapp.libraries.common.testutils import create_report_mocked, CurrentActorMocked, logger_mocked, produce_mocked
@@ -1114,7 +1114,7 @@ def test_gather_target_repositories_rhui(monkeypatch):
     )
 
     monkeypatch.setattr(targetrepos.api, 'current_actor', CurrentActorMocked())
-    monkeypatch.setattr(targetrepos, '_get_all_available_repoids', lambda x: [])
+    monkeypatch.setattr(repofiles, 'get_parsed_repofiles_or_stop', lambda *dummy_args, **dummy_kwargs: [])
     monkeypatch.setattr(
         targetrepos,
         "_get_distro_available_repoids",
@@ -1137,6 +1137,69 @@ def test_gather_target_repositories_rhui(monkeypatch):
     )
     target_repoids = targetrepos.gather_target_repositories(None, indata)
     assert target_repoids == set(['rhui-1', 'rhui-2'])
+
+
+def test_gather_target_repositories_duplicate_repos(monkeypatch):
+    """
+    Test that the duplicate repositories are still reported when rhsm is skipped.
+    """
+    def _repofile(path):
+        return models.RepositoryFile(
+            file=path, data=[models.RepositoryData(repoid='duplicate', name='The duplicate repository')]
+        )
+
+    monkeypatch.setattr(targetrepos.api, 'current_actor', CurrentActorMocked())
+    monkeypatch.setattr(reporting, 'create_report', create_report_mocked())
+    monkeypatch.setattr(rhsm, 'skip_rhsm', lambda: True)
+    monkeypatch.setattr(
+        repofiles,
+        'get_parsed_repofiles_or_stop',
+        lambda *dummy_args, **dummy_kwargs: [
+            _repofile('/etc/yum.repos.d/a.repo'), _repofile('/etc/yum.repos.d/b.repo')
+        ]
+    )
+    monkeypatch.setattr(
+        targetrepos, '_get_distro_available_repoids', lambda dummy_context, dummy_indata: {'distro-repoid'}
+    )
+    monkeypatch.setattr(
+        targetrepos.api, 'consume', lambda x: iter(
+            [models.TargetRepositories(
+                rhel_repos=[], distro_repos=[models.DistroTargetRepository(repoid='distro-repoid')]
+            )]
+        )
+    )
+
+    assert targetrepos.gather_target_repositories(None, None) == {'distro-repoid'}
+
+    assert reporting.create_report.called == 1
+    report = reporting.create_report.reports[0]
+    assert report['title'] == 'A YUM/DNF repository defined multiple times'
+    assert reporting.Groups.INHIBITOR in report['groups']
+    assert 'duplicate' in report['summary']
+
+
+@pytest.mark.parametrize(
+    ('func', 'args'),
+    [
+        (repofiles.get_parsed_repofiles_or_stop, (None, 'Failed to parse available repoids')),
+        (repofiles.parse_repofile_or_stop, ('/etc/yum.repos.d/broken.repo', 'Failed to parse available repoids')),
+    ]
+)
+def test_parsing_of_invalid_repofile_stops_upgrade(monkeypatch, func, args):
+    def raise_invalid_repo(*dummy_args, **dummy_kwargs):
+        raise repofileutils.InvalidRepoDefinition(
+            'Missing name', repofile='/etc/yum.repos.d/broken.repo', repoid='brokenrepo'
+        )
+
+    monkeypatch.setattr(repofileutils, 'get_parsed_repofiles', raise_invalid_repo)
+    monkeypatch.setattr(repofileutils, 'parse_repofile', raise_invalid_repo)
+
+    with pytest.raises(StopActorExecutionError) as err:
+        func(*args)
+
+    assert 'Failed to parse available repoids' in err.value.message
+    assert 'brokenrepo' in err.value.message
+    assert err.value.details['hint'] == repofiles.INVALID_REPOFILE_HINT
 
 
 @suppress_deprecation(models.RHELTargetRepository)
