@@ -15,18 +15,17 @@ from leapp.libraries.common import mounting, overlaygen, rhsm
 from leapp.libraries.common.config import get_env, get_product_type, get_target_distro_id
 from leapp.libraries.common.dnflibs import dnfplugin
 from leapp.libraries.stdlib import api
-from leapp.models import TMPTargetRepositoriesFacts  # deprecated all the time
 from leapp.models import (
+    RepositoriesFactsTarget,
     TargetOSInstallationImage,
     TargetUserSpaceInfo,
     UsedTargetRepositories,
     UsedTargetRepository
 )
-from leapp.utils.deprecation import suppress_deprecation
 
 # NOTE: The repofiles inside the scratch container are parsed twice - once to
 # get the repoids available before the target userspace is created and once
-# after that to produce the TMPTargetRepositoriesFacts msg. These are two
+# after that to produce the RepositoriesFactsTarget msg. These are two
 # different states of the container, so the parsing cannot be deduplicated.
 
 SCRATCH_DIR = os.getenv('LEAPP_CONTAINER_ROOT', '/var/lib/leapp/scratch')
@@ -149,7 +148,6 @@ def _create_target_userspace(context, indata, packages, files, target_repoids):
         rhsm.set_container_mode(target_context)
 
 
-@suppress_deprecation(TMPTargetRepositoriesFacts)
 def perform():
     # NOTE: this one action is out of unit-tests completely; we do not use
     # in unit tests the LEAPP_DEVEL_SKIP_RHSM envar anymore
@@ -183,7 +181,7 @@ def perform():
                           'This issue is typically caused by missing definition of the name field. '
                           'For more information, see: https://access.redhat.com/solutions/6969001.')
                 )
-                api.produce(TMPTargetRepositoriesFacts(repositories=target_repo_facts))
+                api.produce(RepositoriesFactsTarget(repositories=target_repo_facts))
                 # ## TODO ends here
                 api.produce(UsedTargetRepositories(
                     repos=[UsedTargetRepository(repoid=repo) for repo in target_repoids]))
