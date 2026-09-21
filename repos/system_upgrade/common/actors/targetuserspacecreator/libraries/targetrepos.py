@@ -8,7 +8,7 @@ from leapp import reporting
 from leapp.exceptions import StopActorExecution, StopActorExecutionError
 from leapp.libraries.actor import repofiles, targetrhui
 from leapp.libraries.common import distro, repofileutils, rhsm
-from leapp.libraries.common.config import get_source_distro_id, get_target_distro_id, is_conversion
+from leapp.libraries.common.config import get_product_type, get_source_distro_id, get_target_distro_id, is_conversion
 from leapp.libraries.common.config.version import get_source_major_version, get_target_major_version
 from leapp.libraries.stdlib import api, format_list
 from leapp.models import RHELTargetRepository, TargetRepositories
@@ -323,7 +323,38 @@ def adjust_dnf_stream_variable(context, varfile='/etc/dnf/vars/stream'):
             details={'details': str(e)})
 
 
-def setup_and_gather_target_repositories(context, indata, prod_cert_path):
+def _report_missing_product_cert(cert_path):
+    """
+    Report the missing target product certificate.
+
+    :param cert_path: the expected path of the target product certificate
+    :type cert_path: string
+    """
+    additional_summary = ''
+    if get_product_type('target') == 'beta':
+        additional_summary = (
+            ' This can happen when upgrading a beta system and the chosen target version does not have'
+            ' beta certificates attached (for example, because the GA has been released already).'
+        )
+
+    cert = os.path.basename(cert_path)
+    reporting.create_report([
+        reporting.Title('Cannot find the product certificate file for the chosen target system.'),
+        reporting.Summary(
+            'Expected certificate: {cert} with path {path} but it could not be found.{additional}'.format(
+                cert=cert, path=cert_path, additional=additional_summary)
+        ),
+        reporting.Groups([reporting.Groups.REPOSITORY]),
+        reporting.Groups([reporting.Groups.INHIBITOR]),
+        reporting.Severity(reporting.Severity.HIGH),
+        reporting.Remediation(hint=(
+            'Set the corresponding target os version in the LEAPP_DEVEL_TARGET_RELEASE environment variable for'
+            'which the {cert} certificate is provided'.format(cert=cert)
+        )),
+    ])
+
+
+def setup_and_gather_target_repositories(context, indata):
     """
     This is wrapper function to gather the target repoids.
 
@@ -335,11 +366,13 @@ def setup_and_gather_target_repositories(context, indata, prod_cert_path):
     :type context: mounting.IsolatedActions class
     :param indata: majority of input data for the actor
     :type indata: class InputData
-    :param prod_cert_path: path where the target product cert is stored
-    :type prod_cert_path: string
     """
     rhsm.set_container_mode(context)
-    rhsm.switch_certificate(context, indata.rhsm_info, prod_cert_path)
+    try:
+        rhsm.switch_certificate(context, indata.rhsm_info)
+    except rhsm.MissingTargetProductCertificate as err:
+        _report_missing_product_cert(err.details['cert_path'])
+        raise StopActorExecution()
 
     if get_target_distro_id() == 'centos':
         adjust_dnf_stream_variable(context)

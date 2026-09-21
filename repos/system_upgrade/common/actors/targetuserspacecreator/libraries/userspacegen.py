@@ -8,11 +8,8 @@ work is implemented in the libraries imported below.
 
 import os
 
-from leapp import reporting
-from leapp.exceptions import StopActorExecution, StopActorExecutionError
 from leapp.libraries.actor import bootstrap, inputdata, repoaccess, repofiles, targetrepos, targetrhui
 from leapp.libraries.common import mounting, overlaygen, rhsm
-from leapp.libraries.common.config import get_product_type, get_target_distro_id
 from leapp.libraries.common.dnflibs import dnfplugin
 from leapp.libraries.stdlib import api
 from leapp.models import (
@@ -30,82 +27,6 @@ from leapp.models import (
 
 SCRATCH_DIR = os.getenv('LEAPP_CONTAINER_ROOT', '/var/lib/leapp/scratch')
 MOUNTS_DIR = os.path.join(SCRATCH_DIR, 'mounts')
-PROD_CERTS_FOLDER = 'prod-certs'
-
-
-def _get_product_certificate_path():
-    """
-    Retrieve the required / used product certificate for RHSM.
-
-    Product certificates are only used for RHEL. Returns None if the target
-    distro is not RHEL.
-
-    :return: The path to the product certificate or None on non-RHEL systems
-    :raises: StopActorExecution if a certificate cannot be found
-    """
-    if get_target_distro_id() != 'rhel':
-        return None
-
-    architecture = api.current_actor().configuration.architecture
-    target_version = api.current_actor().configuration.version.target
-    target_product_type = get_product_type('target')
-    certs_dir = api.get_common_folder_path(PROD_CERTS_FOLDER)
-
-    # We do not need any special certificates to reach repos from non-ga channels, only beta requires special cert.
-    if target_product_type != 'beta':
-        target_product_type = 'ga'
-
-    prod_certs = {
-        'x86_64': {
-            'ga': '479.pem',
-            'beta': '486.pem',
-        },
-        'aarch64': {
-            'ga': '419.pem',
-            'beta': '363.pem',
-        },
-        'ppc64le': {
-            'ga': '279.pem',
-            'beta': '362.pem',
-        },
-        's390x': {
-            'ga': '72.pem',
-            'beta': '433.pem',
-        }
-    }
-
-    try:
-        cert = prod_certs[architecture][target_product_type]
-    except KeyError as e:
-        raise StopActorExecutionError(message='Failed to determine what certificate to use for {}.'.format(e))
-
-    cert_path = os.path.join(certs_dir, target_version, cert)
-    if not os.path.isfile(cert_path):
-        additional_summary = ''
-        if target_product_type != 'ga':
-            additional_summary = (
-                ' This can happen when upgrading a beta system and the chosen target version does not have'
-                ' beta certificates attached (for example, because the GA has been released already).'
-
-            )
-
-        reporting.create_report([
-            reporting.Title('Cannot find the product certificate file for the chosen target system.'),
-            reporting.Summary(
-                'Expected certificate: {cert} with path {path} but it could not be found.{additional}'.format(
-                    cert=cert, path=cert_path, additional=additional_summary)
-            ),
-            reporting.Groups([reporting.Groups.REPOSITORY]),
-            reporting.Groups([reporting.Groups.INHIBITOR]),
-            reporting.Severity(reporting.Severity.HIGH),
-            reporting.Remediation(hint=(
-                'Set the corresponding target os version in the LEAPP_DEVEL_TARGET_RELEASE environment variable for'
-                'which the {cert} certificate is provided'.format(cert=cert)
-            )),
-        ])
-        raise StopActorExecution()
-
-    return cert_path
 
 
 def _create_target_userspace(context, indata, packages, files, target_repoids):
@@ -136,7 +57,6 @@ def _create_target_userspace(context, indata, packages, files, target_repoids):
 
 def perform():
     indata = inputdata.InputData()
-    prod_cert_path = _get_product_certificate_path()
     reserve_space = overlaygen.get_recommended_leapp_free_space(bootstrap.get_target_userspace())
     with overlaygen.create_source_overlay(
             mounts_dir=MOUNTS_DIR,
@@ -152,7 +72,7 @@ def perform():
                 # TODO: this is out of tests completely
                 targetrhui.setup_target_rhui_access_if_needed(context, indata)
 
-                target_repoids = targetrepos.setup_and_gather_target_repositories(context, indata, prod_cert_path)
+                target_repoids = targetrepos.setup_and_gather_target_repositories(context, indata)
                 _create_target_userspace(context, indata, indata.packages, indata.files, target_repoids)
                 # TODO: this is tmp solution as proper one needs significant refactoring
                 target_repo_facts = repofiles.get_parsed_repofiles_or_stop(

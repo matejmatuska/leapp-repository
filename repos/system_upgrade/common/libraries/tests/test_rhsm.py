@@ -6,6 +6,7 @@ import pytest
 from leapp import reporting
 from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common import repofileutils, rhsm
+from leapp.libraries.common.config import architecture
 from leapp.libraries.common.testutils import create_report_mocked, CurrentActorMocked, logger_mocked
 from leapp.libraries.stdlib import api, CalledProcessError
 from leapp.models import RepositoryData, RepositoryFile, RHSMInfo
@@ -506,5 +507,89 @@ def test_switch_certificate_respect_with_rhsm(monkeypatch, context_mocked):
     cert_path = '/etc/leapp/repos.d/system_upgrade/common/files/prod-certs/10/479.pem'
     rhsm.switch_certificate(context_mocked, mocked_rhsm_info(), cert_path)
 
+    assert context_mocked.remove_called == []
+    assert context_mocked.copy_to_called == []
+
+
+PROD_CERTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'files', 'prod-certs')
+
+
+@pytest.fixture
+def prod_certs_dir_mocked(monkeypatch):
+    """
+    Make the product certificates bundled in the repository discoverable.
+    """
+    monkeypatch.setattr(api, 'get_common_folder_path', lambda dummy_folder: PROD_CERTS_DIR)
+
+
+@pytest.mark.parametrize('expected,dst_ver,arch,prod_type', [
+    (os.path.join('8.1', '479.pem'), '8.1', architecture.ARCH_X86_64, 'ga'),
+    (os.path.join('8.1', '419.pem'), '8.1', architecture.ARCH_ARM64, 'ga'),
+    (os.path.join('8.1', '279.pem'), '8.1', architecture.ARCH_PPC64LE, 'ga'),
+    (os.path.join('8.2', '479.pem'), '8.2', architecture.ARCH_X86_64, 'ga'),
+    (os.path.join('8.5', '486.pem'), '8.5', architecture.ARCH_X86_64, 'beta'),
+    (os.path.join('8.2', '72.pem'), '8.2', architecture.ARCH_S390X, 'ga'),
+    (os.path.join('8.5', '433.pem'), '8.5', architecture.ARCH_S390X, 'beta'),
+    # non-beta product types are expected to use the "ga" certificates
+    (os.path.join('8.1', '479.pem'), '8.1', architecture.ARCH_X86_64, 'htb'),
+])
+def test_get_target_product_certificate_path(monkeypatch, prod_certs_dir_mocked, expected, dst_ver, arch, prod_type):
+    envars = {'LEAPP_DEVEL_TARGET_PRODUCT_TYPE': prod_type}
+    monkeypatch.setattr(api, 'current_actor', CurrentActorMocked(dst_ver=dst_ver, arch=arch, envars=envars))
+
+    assert rhsm._get_target_product_certificate_path() == os.path.join(PROD_CERTS_DIR, expected)
+
+
+def test_get_target_product_certificate_path_minor_fallback(monkeypatch, prod_certs_dir_mocked):
+    """
+    When the certificates for the target minor version are not bundled, the major version ones are used.
+    """
+    monkeypatch.setattr(api, 'current_logger', logger_mocked())
+    monkeypatch.setattr(api, 'current_actor', CurrentActorMocked(dst_ver='8.100'))
+
+    assert rhsm._get_target_product_certificate_path() == os.path.join(PROD_CERTS_DIR, '8', '479.pem')
+
+
+@pytest.mark.parametrize('src_distro', ('rhel', 'centos'))
+def test_get_target_product_certificate_path_nonrhel(monkeypatch, src_distro):
+    monkeypatch.setattr(api, 'current_actor', CurrentActorMocked(src_distro=src_distro, dst_distro='notrhel'))
+
+    assert rhsm._get_target_product_certificate_path() is None
+
+
+def test_get_target_product_certificate_path_unknown_arch(monkeypatch, prod_certs_dir_mocked):
+    monkeypatch.setattr(api, 'current_actor', CurrentActorMocked(arch='unknown-arch'))
+
+    with pytest.raises(StopActorExecutionError) as err:
+        rhsm._get_target_product_certificate_path()
+
+    assert 'Failed to determine what certificate to use' in str(err.value)
+
+
+def test_switch_certificate_autodiscovery(monkeypatch, context_mocked, actor_mocked, prod_certs_dir_mocked):
+    """
+    When no certificate path is given, the expected target certificate is discovered automatically.
+    """
+    monkeypatch.setattr(
+        os.path, 'isdir', lambda path: path in ('/etc/pki/product', '/etc/pki/product-default')
+    )
+
+    rhsm.switch_certificate(context_mocked, mocked_rhsm_info())
+
+    cert_path = os.path.join(PROD_CERTS_DIR, actor_mocked.configuration.version.target, '479.pem')
+    assert context_mocked.copy_to_called == [
+        (cert_path, os.path.join(target_path, '479.pem'))
+        for target_path in ('/etc/pki/product', '/etc/pki/product-default')
+    ]
+
+
+def test_switch_certificate_missing_certificate(monkeypatch, context_mocked, actor_mocked):
+    cert_path = '/etc/leapp/repos.d/system_upgrade/common/files/prod-certs/10/479.pem'
+    monkeypatch.setattr(os.path, 'isfile', lambda dummy_path: False)
+
+    with pytest.raises(rhsm.MissingTargetProductCertificate) as err:
+        rhsm.switch_certificate(context_mocked, mocked_rhsm_info(), cert_path)
+
+    assert err.value.details['cert_path'] == cert_path
     assert context_mocked.remove_called == []
     assert context_mocked.copy_to_called == []

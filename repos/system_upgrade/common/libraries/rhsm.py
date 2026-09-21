@@ -472,8 +472,6 @@ def switch_certificate(context, rhsm_info, cert_path=None):
     :raises: MissingTargetProductCertificate if a certificate cannot be found
     :raises: StopActorExecutionError if cannot determine product certificate name
     """
-    # TODO(pstodulk): Add unit tests to cover automatic prod cert discovery and
-    # missing path.
     if cert_path is None:
         cert_path = _get_target_product_certificate_path()
 
