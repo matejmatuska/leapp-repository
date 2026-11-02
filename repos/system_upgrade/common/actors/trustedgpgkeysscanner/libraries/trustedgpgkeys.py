@@ -16,7 +16,7 @@ from leapp.models import GpgKey, InstalledRPM, MisplacedTrustedGpgKeys, TrustedG
 
 def _get_pubkeys_from_pqrmdb():
     # Example output:
-    #   rpm -qa --dbpath /usr/lib/pqrpm/lib/sysimage/rpm/
+    #   rpm -qa --dbpath /usr/lib/pqrpm/lib/sysimage/rpm/ gpg-pubkey
     #   warning: Unsupported version of key: V6
     #   warning: Could not load key gpg-pubkey-05707a62-68e6a1f3
     #   gpg-pubkey-b2973cf6-5dfd1395
@@ -26,7 +26,8 @@ def _get_pubkeys_from_pqrmdb():
 
     pqrpmdb_path = '/usr/lib/pqrpm/lib/sysimage/rpm/'
     try:
-        result = run(['rpm', '-qa', '--dbpath', pqrpmdb_path], split=True)
+        # limit to gpg-pubkey, but there shouldn't ever be any other packages than those
+        result = run(['rpm', '-qa', '--dbpath', pqrpmdb_path, 'gpg-pubkey'], split=True)
     except CalledProcessError as e:
         raise StopActorExecutionError(
             f'Failed to query pqrpmdb at {pqrpmdb_path} for imported GPG keys',
