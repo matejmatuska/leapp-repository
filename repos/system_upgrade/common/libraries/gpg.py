@@ -1,6 +1,9 @@
 import os
 from collections import namedtuple
 
+import rpm
+
+from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common import config
 from leapp.libraries.common.config.version import get_target_major_version, matches_source_version
 from leapp.libraries.stdlib import api, CalledProcessError, run
@@ -22,8 +25,45 @@ _SHORT_KEY_ID_SLICE = {
 }
 
 
+class GpgReadError(StopActorExecutionError):
+    pass
+
+
 class GpgParseError(Exception):
     pass
+
+
+# TODO when (if) some generic way to query rpmdb is added, deprecate this or
+# make it a wrapper
+def get_gpg_ascii_from_rpmdb(pubkey_rpm, db_path=None):
+    """
+    Get the ascii armor of GPG key(s) imported in rpm DB
+
+    :return: List of ascii armors for the matched packages matching `pubkey_rpm`
+    :rtype: List[str]
+    """
+    if not pubkey_rpm.startswith('gpg-pubkey'):
+        raise ValueError('Only gpg-pubkey packages are allowed')
+
+    # this branching db_path is not nice, but it's the cleanest way to use the
+    # default db without hardocoding it or getting it through
+    # rpm.expandMacro('%{_dbpath}')
+    if db_path:
+        rpm.addMacro('_dbpath', db_path)
+    try:
+        ts = rpm.TransactionSet()
+        if db_path:
+            ts.openDB()
+        matched = ts.dbMatch('name', pubkey_rpm)
+    finally:
+        # this is global, make sure we unset it
+        if db_path:
+            rpm.delMacro('_dbpath')
+
+    if not matched:
+        return None
+    # name can match multiple rpms
+    return [hdr[rpm.RPMTAG_DESCRIPTION] for hdr in matched]
 
 
 def get_pubkeys_from_rpms(installed_rpms):
