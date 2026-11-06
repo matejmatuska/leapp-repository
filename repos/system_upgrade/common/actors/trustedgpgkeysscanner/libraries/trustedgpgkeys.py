@@ -18,7 +18,7 @@ _PQRPM_DB_PATH = '/usr/lib/pqrpm/lib/sysimage/rpm/'
 
 
 def _key_info_to_model(info, rpmdb, filename=None):
-    model =  GpgKey(
+    model = GpgKey(
         fingerprint=info.short_keyid,
         short_keyid=info.short_keyid,
         full_fingerprint=info.fingerprint,

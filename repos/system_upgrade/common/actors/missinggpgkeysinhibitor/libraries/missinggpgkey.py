@@ -9,7 +9,7 @@ from six.moves import urllib
 from leapp import reporting
 from leapp.exceptions import StopActorExecution, StopActorExecutionError
 from leapp.libraries.common.config.version import get_target_major_version, matches_source_version
-from leapp.libraries.common.gpg import get_gpg_fp_from_file, get_path_to_gpg_certs, is_nogpgcheck_set
+from leapp.libraries.common.gpg import GpgReadError, get_path_to_gpg_certs, is_nogpgcheck_set, parse_gpg_key_from_file
 from leapp.libraries.stdlib import api, format_list
 from leapp.models import (
     DNFWorkaround,
@@ -300,7 +300,7 @@ def process():
     invalid_keys = list()
     repos_missing_keys = list()
 
-    pubkeys = [key.fingerprint for key in trusted_gpg_keys.items]
+    pubkeys = [key.full_fingerprint for key in trusted_gpg_keys.items]
     processed_gpgkey_urls = set()
     tmpdir = None
     for repoid in used_target_repos:
@@ -320,7 +320,7 @@ def process():
 
             if gpgkey_url.startswith('file:///'):
                 key_file = _get_abs_file_path(target_userspace, gpgkey_url)
-            elif gpgkey_url.startswith('http://') or gpgkey_url.startswith('https://'):
+            elif gpgkey_url.startswith(('http://', 'https://')):
                 # delay creating temporary directory until we need it
                 tmpdir = tempfile.mkdtemp() if tmpdir is None else tmpdir
                 # FIXME: what to do with dummy? it's fd, that should be closed also
@@ -338,15 +338,23 @@ def process():
                 api.current_logger().error(
                     'Skipping unknown protocol for gpgkey {}'.format(gpgkey_url))
                 continue
-            fps = get_gpg_fp_from_file(key_file)
-            if not fps:
+
+            try:
+                key_infos = parse_gpg_key_from_file(key_file)
+            except GpgReadError as err:
+                invalid_keys.append(gpgkey_url)
+                api.current_logger().warning(
+                    'Cannot get any gpg key from the file: {}: {}'.format(gpgkey_url, str(err))
+                )
+                continue
+            if not key_infos:
                 invalid_keys.append(gpgkey_url)
                 api.current_logger().warning(
                     'Cannot get any gpg key from the file: {}'.format(gpgkey_url)
                 )
                 continue
-            for fp in fps:
-                if fp not in pubkeys and gpgkey_url not in missing_keys:
+            for key in key_infos:
+                if key.full_fingerprint not in pubkeys and gpgkey_url not in missing_keys:
                     missing_keys.append(_get_abs_file_path(target_userspace, gpgkey_url))
 
     if tmpdir:
