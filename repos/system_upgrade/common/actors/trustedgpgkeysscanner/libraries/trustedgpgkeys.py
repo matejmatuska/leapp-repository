@@ -4,54 +4,29 @@ from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common.config.version import matches_source_version
 from leapp.libraries.common.gpg import (
     get_path_to_gpg_certs,
-    get_pubkeys_from_rpms,
     GPG_PQC_CERTS_SUBFOLDER,
     iter_gpg_keyfiles,
     parse_gpg_key_from_file
 )
 from leapp.libraries.common.rpms import has_package
-from leapp.libraries.stdlib import api, CalledProcessError, run
+from leapp.libraries.stdlib import api
 from leapp.models import GpgKey, InstalledRPM, MisplacedTrustedGpgKeys, TrustedGpgKeys
 
+from repos.system_upgrade.common.libraries.gpg import GpgReadError, get_gpg_ascii_from_rpmdb, parse_gpg_key_from_ascii
 
-def _get_pubkeys_from_pqrmdb():
-    # Example output:
-    #   rpm -qa --dbpath /usr/lib/pqrpm/lib/sysimage/rpm/ gpg-pubkey
-    #   warning: Unsupported version of key: V6
-    #   warning: Could not load key gpg-pubkey-05707a62-68e6a1f3
-    #   gpg-pubkey-b2973cf6-5dfd1395
-    #   gpg-pubkey-05707a62-68e6a1f3
-    #
-    # warnings are logged to stderr
+_PQRPM_DB_PATH = '/usr/lib/pqrpm/lib/sysimage/rpm/'
 
-    pqrpmdb_path = '/usr/lib/pqrpm/lib/sysimage/rpm/'
-    try:
-        # limit to gpg-pubkey, but there shouldn't ever be any other packages than those
-        result = run(['rpm', '-qa', '--dbpath', pqrpmdb_path, 'gpg-pubkey'], split=True)
-    except CalledProcessError as e:
-        raise StopActorExecutionError(
-            f'Failed to query pqrpmdb at {pqrpmdb_path} for imported GPG keys',
-            details={'details': str(e)}
-        )
 
-    keys = []
-    for line in result['stdout']:
-        parts = line.strip().split('-')
-        if (
-            not len(parts) == 4
-            # there should never be packages other than gpg-pubkey, if they
-            # are, it can be considered an error
-            or not parts[0] == 'gpg'
-            or not parts[1] == 'pubkey'
-            or not len(parts[2]) == 8
-        ):
-            error = 'Failed to parse fingerprint gpg-pubkey package name {}'.format(line)
-            api.current_logger().error(error)
-            continue
-
-        # let's make it count as rpmdb=True, because it is imported
-        keys.append(GpgKey(fingerprint=parts[2], rpmdb=True))
-    return keys
+def _key_info_to_model(info, rpmdb, filename=None):
+    model =  GpgKey(
+        fingerprint=info.short_keyid,
+        short_keyid=info.short_keyid,
+        full_fingerprint=info.fingerprint,
+        rpmdb=rpmdb,
+    )
+    if filename is not None:
+        model.filename = filename
+    return model
 
 
 def _parse_trusted_keyfiles(include_pqc):
@@ -64,27 +39,51 @@ def _parse_trusted_keyfiles(include_pqc):
     return file_to_fps
 
 
-def _get_pubkeys(installed_rpms, keyfiles_to_fps):
+def _get_parsed_keys_from_rpmdb(db_path=None):
+    ascii_strs = get_gpg_ascii_from_rpmdb('gpg-pubkey', db_path)
+    if ascii_strs is None:
+        api.current_logger.debug('No gpg-pubkey rpms found in rpmdb at {}', db_path)
+    # flatten, though each pubkey should only ever have one key,
+    # parse_gpg_key_from_ascii returns a list
+    ret = []
+    for ascii_str in (ascii_strs or []):
+        try:
+            ret.extend(parse_gpg_key_from_ascii(ascii_str))
+        except GpgReadError as err:
+            # NOTE(mmatuska): the actor never handled gpg parsing errors, keeping that
+            # behaviour, but it could be changed now
+            api.current_logger().error(str(err))
+    return ret
+
+
+def _get_pubkeys(installed_rpms, keyfiles_to_infos):
     """
     Get pubkeys from installed rpms and the trusted directory
     """
-    pubkeys = get_pubkeys_from_rpms(installed_rpms)
-    db_pubkeys = {key.fingerprint for key in pubkeys}
+    key_infos = _get_parsed_keys_from_rpmdb()
+    lookup = {key.fingerprint for key in key_infos}
 
     # pqrpm, which owns the pqrpmdb is only available on >= 9.7 && < 10.0,
     # however 'sq', without which full PQC enablement during the upgrade is not
     # possible, is only available on >= 9.9.
     if has_package(InstalledRPM, 'pqrpm') and matches_source_version('>= 9.9'):
-        # deduplicate, leapp Models are not hashable
-        pqc_pubkeys = [k for k in _get_pubkeys_from_pqrmdb() if k.fingerprint not in db_pubkeys]
-        pubkeys += pqc_pubkeys
-        db_pubkeys |= {k.fingerprint for k in pqc_pubkeys}
+        # deduplicate, GpgKeyInfo is hashable, but lets use just the
+        # fingerprint as the hash
+        pqc_key_infos = [
+            k
+            for k in _get_parsed_keys_from_rpmdb(_PQRPM_DB_PATH)
+            if k.fingerprint not in lookup
+        ]
+        key_infos += pqc_key_infos
+        lookup |= {k.fingerprint for k in pqc_key_infos}
 
-    for key_file, fps in keyfiles_to_fps.items():
-        for fp in fps:
-            if fp not in db_pubkeys:
-                pubkeys.append(GpgKey(fingerprint=fp, rpmdb=False, filename=key_file))
-                db_pubkeys.add(fp)
+    pubkeys = [_key_info_to_model(i, rpmdb=True) for i in key_infos ]
+
+    for keyfile, infos in keyfiles_to_infos.items():
+        for info in infos:
+            if info.fingerprint not in lookup:
+                pubkeys.append(_key_info_to_model(info, rpmdb=False, filename=keyfile))
+                lookup.add(info.fingerprint)
     return pubkeys
 
 
@@ -98,22 +97,19 @@ def _get_misplaced_keyfiles(keyfiles_to_infos):
     misplaced_pqc = []  # pqc (v6) keys found at the 'root_dir'
     misplaced_classic = []  # non-PQC keys found in the 'pqc_dir'
 
-    def make_model(keyfile, info):
-        return GpgKey(
-            fingerprint=info.short_keyid,
-            rpmdb=False,
-            filename=keyfile
-        )
-
     for keyfile, key_infos in keyfiles_to_infos.items():
         if os.path.dirname(keyfile) == pqc_dir:
             misplaced_classic += [
-                make_model(keyfile, key) for key in key_infos if not key.is_pqc
+                _key_info_to_model(key, rpmdb=False, filename=keyfile)
+                for key in key_infos
+                if not key.is_pqc
             ]
         else:
             # subdirs other than pqc are ignored by the iterator
             misplaced_pqc += [
-                make_model(keyfile, key) for key in key_infos if key.is_pqc
+                _key_info_to_model(key, rpmdb=False, filename=keyfile)
+                for key in key_infos
+                if key.is_pqc
             ]
 
     return misplaced_pqc, misplaced_classic
@@ -138,11 +134,7 @@ def process():
     # without sq there is no way to process PQC keys
     keyfiles_to_infos = _parse_trusted_keyfiles(include_pqc=has_sq)
 
-    keyfiles_to_fps = {
-        keyfile: [key_info.short_keyid for key_info in infos]
-        for keyfile, infos in keyfiles_to_infos.items()
-    }
-    pubkeys = _get_pubkeys(installed_rpms, keyfiles_to_fps)
+    pubkeys = _get_pubkeys(installed_rpms, keyfiles_to_infos)
     api.produce(TrustedGpgKeys(items=pubkeys))
 
     if not has_sq:
