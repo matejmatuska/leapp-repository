@@ -35,14 +35,16 @@ class GpgParseError(Exception):
 
 # TODO when (if) some generic way to query rpmdb is added, deprecate this or
 # make it a wrapper
-def get_gpg_ascii_from_rpmdb(pubkey_rpm, db_path=None):
+def get_gpg_ascii_from_rpmdb(query_name, db_path=None):
     """
     Get the ascii armor of GPG key(s) imported in rpm DB
 
     :return: List of ascii armors for the matched packages matching `pubkey_rpm`
     :rtype: List[str]
+    :raises ValueError: If `query_name` does not begin with gpg-pubkey
+    :raises rpm.error: Propagates any rpm errors
     """
-    if not pubkey_rpm.startswith('gpg-pubkey'):
+    if not query_name.startswith('gpg-pubkey'):
         raise ValueError('Only gpg-pubkey packages are allowed')
 
     # this branching db_path is not nice, but it's the cleanest way to use the
@@ -54,7 +56,7 @@ def get_gpg_ascii_from_rpmdb(pubkey_rpm, db_path=None):
         ts = rpm.TransactionSet()
         if db_path:
             ts.openDB()
-        matched = ts.dbMatch('name', pubkey_rpm)
+        matched = ts.dbMatch('name', query_name)
     finally:
         # this is global, make sure we unset it
         if db_path:
@@ -66,6 +68,7 @@ def get_gpg_ascii_from_rpmdb(pubkey_rpm, db_path=None):
     return [hdr[rpm.RPMTAG_DESCRIPTION] for hdr in matched]
 
 
+# TODO deprecate?
 def get_pubkeys_from_rpms(installed_rpms):
     """
     Return the list of fingerprints of GPG keys in RPM DB
@@ -79,8 +82,19 @@ def get_pubkeys_from_rpms(installed_rpms):
     :return: list of GPG keys from RPM DB
     :rtype: list(leapp.models.GpgKey)
     """
-    # TODO
-    return [GpgKey(fingerprint=pkg.version, rpmdb=True) for pkg in installed_rpms.items if pkg.name == 'gpg-pubkey']
+
+    return [
+        GpgKey(
+            fingerprint=pkg.version,
+            # NOTE: this is incorrect pkg.version is the short_keyid, there is
+            # no other way to keep the api compatible though
+            full_fingerprint=pkg.version,
+            short_keyid=pkg.version,
+            rpmdb=True,
+        )
+        for pkg in installed_rpms.items
+        if pkg.name == 'gpg-pubkey'
+    ]
 
 
 def _parse_fp_from_gpg(output):
