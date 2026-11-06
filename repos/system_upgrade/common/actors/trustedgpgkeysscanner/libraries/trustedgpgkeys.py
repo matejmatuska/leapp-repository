@@ -3,16 +3,17 @@ import os
 from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common.config.version import matches_source_version
 from leapp.libraries.common.gpg import (
+    GpgReadError,
+    get_gpg_ascii_from_rpmdb,
     get_path_to_gpg_certs,
     GPG_PQC_CERTS_SUBFOLDER,
     iter_gpg_keyfiles,
-    parse_gpg_key_from_file
+    parse_gpg_key_from_file,
+    parse_gpg_key_from_ascii
 )
 from leapp.libraries.common.rpms import has_package
 from leapp.libraries.stdlib import api
 from leapp.models import GpgKey, InstalledRPM, MisplacedTrustedGpgKeys, TrustedGpgKeys
-
-from repos.system_upgrade.common.libraries.gpg import GpgReadError, get_gpg_ascii_from_rpmdb, parse_gpg_key_from_ascii
 
 _PQRPM_DB_PATH = '/usr/lib/pqrpm/lib/sysimage/rpm/'
 
