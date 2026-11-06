@@ -13,6 +13,21 @@ class GpgKey(Model):
     fingerprint = fields.String()
     """
     The short key ID of the fingerprint
+
+    DEPRECATED: Use short_keyid to get the short key ID or full_fingerprint to
+    get the full fingerprint of the key.
+    """
+
+    short_keyid = fields.String()
+    """
+    The short key ID of the fingerprint
+    """
+
+    full_fingerprint = fields.String()
+    """
+    The full fingerprint of the key
+
+    Note that the length of fingerprint is variable, depending on version/used algorithm.
     """
 
     rpmdb = fields.Boolean()
