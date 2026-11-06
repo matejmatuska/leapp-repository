@@ -79,26 +79,8 @@ def get_pubkeys_from_rpms(installed_rpms):
     :return: list of GPG keys from RPM DB
     :rtype: list(leapp.models.GpgKey)
     """
+    # TODO
     return [GpgKey(fingerprint=pkg.version, rpmdb=True) for pkg in installed_rpms.items if pkg.name == 'gpg-pubkey']
-
-
-def _gpg_show_keys(key_path):
-    """
-    Show keys in given file in version-agnostic manner
-
-    This runs gpg --show-keys to verify the given file exists, is readable and
-    contains valid OpenPGP key data, which is printed in parsable format (--with-colons).
-    """
-    try:
-        cmd = ['gpg2', '--show-keys', '--with-colons', key_path]
-        # TODO: discussed, most likely the checked=False will be dropped
-        # and error will be handled in other functions
-        return run(cmd, split=True, checked=False)
-    except OSError as err:
-        # NOTE: this is hypothetic; gnupg2 has to be installed on RHEL 7+
-        error = 'Failed to read fingerprint from GPG key {}: {}'.format(key_path, str(err))
-        api.current_logger().error(error)
-        return {}
 
 
 def _parse_fp_from_gpg(output):
@@ -129,7 +111,7 @@ def _parse_fp_from_gpg(output):
         unreadable file, or no OpenPGP data)
     :rtype: list(str)
     """
-    if not output or output['exit_code']:
+    if not output:
         return []
 
     gpg_fps = []
@@ -153,8 +135,7 @@ def _parse_fp_from_gpg(output):
             gpg_fps.append(parts[9].lower())
         else:
             api.current_logger().warning(
-                'Cannot parse the gpg2 output. Line: "{}"'
-                .format(line)
+                f'Cannot parse the gpg2 output. Line: "{line}"'
             )
 
     return gpg_fps
@@ -163,7 +144,7 @@ def _parse_fp_from_gpg(output):
 GpgKeyInfo = namedtuple('GpgKeyInfo', ('fingerprint', 'short_keyid', 'is_pqc'))
 
 
-def _parse_gpg_key_gpg2(key_path):
+def _parse_gpg_key_gpg2(stdin):
     """
     Return the list of public keys stored in the given file using 'gpg2'
 
@@ -175,7 +156,13 @@ def _parse_gpg_key_gpg2(key_path):
     :return: List of the public keys from the given file
     :rtype: list(dict)
     """
-    output = _gpg_show_keys(key_path)
+    try:
+        cmd = ['gpg2', '--show-keys', '--with-colons']
+        output = run(cmd, split=True, stdin=stdin)
+    except (OSError, CalledProcessError) as err:
+        # NOTE: OSError this is hypothetic; gnupg2 has to be installed on RHEL 7+
+        error = f'Failed to read fingerprint from GPG key: {str(err)}'
+        raise GpgReadError(error) from err
 
     # hardcode is_pqc=False because gpg2 cannot parse v6 keys so no pqc
     keys = [
@@ -188,8 +175,9 @@ def _parse_gpg_key_gpg2(key_path):
     ]
 
     if not keys:
+        # TODO propagate?
         api.current_logger().warning(
-            'Unable to read OpenPGP keys from {}: {}'.format(key_path, output.get('stderr', ''))
+            'Unable to read OpenPGP keys from ascii armor: {}'.format(output.get('stderr', ''))
         )
     return keys
 
@@ -222,7 +210,7 @@ def _iter_sq_packets(dump):
         yield header, body
 
 
-def _parse_public_key_packet_sq(body, key_path):
+def _parse_public_key_packet_sq(body):
     """
     Return the key described by the body of a single Public-Key Packet
 
@@ -242,12 +230,12 @@ def _parse_public_key_packet_sq(body, key_path):
 
     missing = {'Version', 'Fingerprint'} - set(fields)
     if missing:
-        error = 'Missing fields {} of a key in the keyfile {}'.format(sorted(missing), key_path)
+        error = f'Missing fields {sorted(missing)}'
         raise GpgParseError(error)
 
     version = fields['Version']
     if version not in _SHORT_KEY_ID_SLICE:
-        error = 'Unexpected key version \'{}\' in the keyfile {}'.format(version, key_path)
+        error = f'Unexpected key version \'{version}\''
         raise GpgParseError(error)
 
     fingerprint = fields['Fingerprint'].lower()
@@ -258,7 +246,7 @@ def _parse_public_key_packet_sq(body, key_path):
     )
 
 
-def _parse_gpg_key_sq(key_path):
+def _parse_gpg_key_sq(stdin):
     """
     Return the list of public keys stored in the given file using 'sq'
 
@@ -268,25 +256,36 @@ def _parse_gpg_key_sq(key_path):
     :rtype: list(str)
     """
     try:
-        cmd = ['sq', 'packet', 'dump', key_path]
-        output = run(cmd, split=True)
+        cmd = ['sq', 'packet', 'dump']
+        output = run(cmd, split=True, stdin=stdin)
     except (OSError, CalledProcessError) as err:
-        error = 'Failed to read fingerprint from GPG key {}: {}'.format(key_path, str(err))
-        api.current_logger().error(error)
-        # if can't be read, return empty, same as _parse_fp_from_gpg()
-        return []
+        error = f'Failed to read fingerprint from GPG key: {str(err)}'
+        raise GpgReadError(error) from err
 
     gpg_infos = []
     for header, body in _iter_sq_packets(output['stdout']):
         if header.startswith('Public-Key Packet'):
             try:
-                gpg_infos.append(_parse_public_key_packet_sq(body, key_path))
+                gpg_infos.append(_parse_public_key_packet_sq(body))
             except GpgParseError as err:
                 # just log the exception, same as _parse_fp_from_gpg() does
-                error = 'Failed to parse GPG key {}: {}'.format(key_path, str(err))
+                error = f'Failed to parse Public-Key Packet {body}: {str(err)}'
                 api.current_logger().error(error)
+                # TODO propagate?
 
     return gpg_infos
+
+
+def parse_gpg_key_from_ascii(ascii_armor):
+    """
+    :type ascii_armor: str
+    :raises GpgReadError: When failed to read the keys using the underlying tool (gpg2 or sq)
+    """
+    # The sequoia-sq package providing the sq command is available only since RHEL 9.9
+    if matches_source_version('< 9.9'):
+        return _parse_gpg_key_gpg2(ascii_armor)
+
+    return _parse_gpg_key_sq(ascii_armor)
 
 
 def parse_gpg_key_from_file(key_path):
@@ -303,12 +302,15 @@ def parse_gpg_key_from_file(key_path):
     :type key_path: str
     :return: List of the public keys from the given file
     :rtype: list(GpgKeyInfo)
+
+    :raises GpgReadError: When failed to read the keys using the underlying tool (gpg2 or sq)
     """
     # The sequoia-sq package providing the sq command is available only since RHEL 9.9
-    if matches_source_version('< 9.9'):
-        return _parse_gpg_key_gpg2(key_path)
+    with open(key_path) as fp:
+        if matches_source_version('< 9.9'):
+            return _parse_gpg_key_gpg2(fp.fileno())
 
-    return _parse_gpg_key_sq(key_path)
+        return _parse_gpg_key_sq(fp.fileno())
 
 
 def get_gpg_fp_from_file(key_path):
@@ -326,7 +328,13 @@ def get_gpg_fp_from_file(key_path):
     :return: List of public key fingerprints from the given file
     :rtype: list(str)
     """
-    fps = parse_gpg_key_from_file(key_path)
+    try:
+        fps = parse_gpg_key_from_file(key_path)
+    except GpgReadError as err:
+        # this could now be propagated, but we need to preserve the api
+        api.current_logger().error(err)
+        return []
+
     return [fp.short_keyid for fp in fps]
 
 
