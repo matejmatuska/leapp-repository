@@ -1,5 +1,7 @@
 import os
 
+import rpm
+
 from leapp.exceptions import StopActorExecutionError
 from leapp.libraries.common.config.version import matches_source_version
 from leapp.libraries.common.gpg import (
@@ -41,7 +43,14 @@ def _parse_trusted_keyfiles(include_pqc):
 
 
 def _get_parsed_keys_from_rpmdb(db_path=None):
-    ascii_strs = get_gpg_ascii_from_rpmdb('gpg-pubkey', db_path)
+    try:
+        ascii_strs = get_gpg_ascii_from_rpmdb('gpg-pubkey', db_path)
+    except rpm.error as err:
+        # no way to continue
+        raise StopActorExecutionError(
+            'Failed to query GPG keys from RPM DB', details={'details': str(err)}
+        )
+
     if ascii_strs is None:
         api.current_logger.debug('No gpg-pubkey rpms found in rpmdb at {}', db_path)
     # flatten, though each pubkey should only ever have one key,
